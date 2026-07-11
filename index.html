@@ -528,7 +528,8 @@
 
       if (currentMap && currentMap.tiles.length > 0) {
         // カメラの追従
-        const displayPivot = Math.min(Math.max(0, (mode === 'edit' ? selectedTileIndex : ballPivotIndex)), currentMap.tiles.length - 1);
+        // プレイモードの非プレイ中（待機画面やゲームオーバー画面）なら常に最初のタイル(0)を表示する
+        const displayPivot = Math.min(Math.max(0, (mode === 'edit' ? selectedTileIndex : (isGameRunning ? ballPivotIndex : 0))), currentMap.tiles.length - 1);
         const pivotPos = getTilePosition(displayPivot);
         cameraX += (pivotPos.x - cameraX) * 0.1;
         cameraY += (pivotPos.y - cameraY) * 0.1;
@@ -654,19 +655,36 @@
           ctx.fill();
           ctx.shadowBlur = 0;
         } else {
-          // 非プレイ中：現在選択されている(またはプレイ用の)ピボットを基準にする
-          const displayPivot = Math.min(Math.max(0, (mode === 'edit' ? selectedTileIndex : ballPivotIndex)), currentMap.tiles.length - 1);
+          // 非プレイ中：プレイモードなら常にスタート位置(0)、エディタモードなら現在選択中のタイル
+          const displayPivot = mode === 'edit' ? selectedTileIndex : 0;
           const pos = getTilePosition(displayPivot);
           const px = pos.x + offsetX;
           const py = pos.y + offsetY;
           
+          // 最初のタイルから次のタイルへの方向角度を調べる（初期表示を進行方向に合わせる）
+          let startAngle = 0; // デフォルトは右(0度)
+          const nextTile = currentMap.tiles[displayPivot + 1];
+          if (nextTile && nextTile.angle !== null) {
+            startAngle = (nextTile.angle * Math.PI) / 180;
+          }
+          
+          const tx = px + Math.cos(startAngle) * TILE_DISTANCE;
+          const ty = py + Math.sin(startAngle) * TILE_DISTANCE;
+
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(tx, ty);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.stroke();
+
           ctx.beginPath();
           ctx.arc(px, py, 12, 0, Math.PI * 2);
           ctx.fillStyle = '#ef4444';
           ctx.fill();
 
           ctx.beginPath();
-          ctx.arc(px + TILE_DISTANCE, py, 12, 0, Math.PI * 2);
+          ctx.arc(tx, ty, 12, 0, Math.PI * 2);
           ctx.fillStyle = 'rgba(59, 130, 246, 0.5)';
           ctx.fill();
         }
@@ -1070,6 +1088,7 @@
       updateUI();
     }
 
+    // 新しくタイルが追加されたときにスクロールして追従するように改善
     function addTile() {
       const lastTile = currentMap.tiles[currentMap.tiles.length - 1];
       const newId = lastTile ? lastTile.id + 1 : 1;
@@ -1082,6 +1101,12 @@
       selectedTileIndex = currentMap.tiles.length - 1;
       clampIndices();
       updateUI();
+      
+      // 追加したタイルにリスト表示を自動スクロール
+      setTimeout(() => {
+        const container = document.getElementById('tile-list-container');
+        if (container) container.scrollTop = container.scrollHeight;
+      }, 50);
     }
 
     function deleteSelectedTile() {
