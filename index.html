@@ -314,7 +314,7 @@
           <input type="text" id="meta-title" placeholder="例: My Favorite Song" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
         </div>
         <div>
-          <label class="block text-xs text-slate-400 mb-1">YouTube 動画ID (11桁の英数字)</label>
+          <label class="block text-xs text-slate-400 mb-1">YouTube 動画ID (11桁 of alphanumeric)</label>
           <input type="text" id="meta-video-id" placeholder="例: dQw4w9WgXcQ" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
           <p class="text-[10px] text-slate-500 mt-1">動画URLの「v=xxxxxxx」の部分を入力します。</p>
         </div>
@@ -356,35 +356,34 @@
     let ytPlayer = null;
     let ytReady = false;
     let ytState = -1; // YouTube PlayerState
-    let adDetectTimer = null;
 
     // 現在展開中の譜面（JSON）
     let currentMap = {
-      title: "デモ・オービット",
-      videoID: "Qd01-62VbE8", // 初期のダミー/デモ用楽曲 (NCS等の良曲など)
+      title: "Cartoon - On & On (NCS)",
+      videoID: "K4DyBUG242c", // 世界的に確実に再生可能な動画
       author: "System",
       memo: "スペースキーでテスト可能なデフォルトのデモ譜面です。",
       tiles: [
-        { id: 1, angle: null, bpm: 120 },
-        { id: 2, angle: 0, bpm: 120 },
-        { id: 3, angle: 90, bpm: 120 },
-        { id: 4, angle: 180, bpm: 120 },
-        { id: 5, angle: 270, bpm: 120 },
-        { id: 6, angle: 0, bpm: 150 }, // ここから加速
-        { id: 7, angle: 0, bpm: 150 },
-        { id: 8, angle: 90, bpm: 150 },
-        { id: 9, angle: 180, bpm: 150 },
-        { id: 10, angle: 270, bpm: 150 },
-        { id: 11, angle: 0, bpm: 90 }, // ここから減速
-        { id: 12, angle: 180, bpm: 90 },
-        { id: 13, angle: 0, bpm: 90 },
-        { id: 14, angle: 180, bpm: 90 },
-        { id: 15, angle: 90, bpm: 120 },
-        { id: 16, angle: 0, bpm: 120 },
-        { id: 17, angle: 270, bpm: 120 },
-        { id: 18, angle: 180, bpm: 120 },
-        { id: 19, angle: 90, bpm: 120 },
-        { id: 20, angle: 0, bpm: 120 }
+        { id: 1, angle: null, bpm: 124 },
+        { id: 2, angle: 0, bpm: 124 },
+        { id: 3, angle: 90, bpm: 124 },
+        { id: 4, angle: 180, bpm: 124 },
+        { id: 5, angle: 270, bpm: 124 },
+        { id: 6, angle: 0, bpm: 124 },
+        { id: 7, angle: 0, bpm: 124 },
+        { id: 8, angle: 90, bpm: 124 },
+        { id: 9, angle: 180, bpm: 124 },
+        { id: 10, angle: 270, bpm: 124 },
+        { id: 11, angle: 0, bpm: 124 },
+        { id: 12, angle: 180, bpm: 124 },
+        { id: 13, angle: 0, bpm: 124 },
+        { id: 14, angle: 180, bpm: 124 },
+        { id: 15, angle: 90, bpm: 124 },
+        { id: 16, angle: 0, bpm: 124 },
+        { id: 17, angle: 270, bpm: 124 },
+        { id: 18, angle: 180, bpm: 124 },
+        { id: 19, angle: 90, bpm: 124 },
+        { id: 20, angle: 0, bpm: 124 }
       ]
     };
 
@@ -417,7 +416,9 @@
 
     function initPlayer(videoId) {
       if (ytPlayer) {
-        ytPlayer.destroy();
+        try {
+          ytPlayer.destroy();
+        } catch(e) {}
       }
       
       // IFrameの設置
@@ -434,6 +435,7 @@
           disablekb: 1,
           fs: 0,
           rel: 0,
+          autoplay: 0,
           modestbranding: 1
         },
         events: {
@@ -481,7 +483,6 @@
     }
 
     // --- 描画ロジック ---
-    // タイルの絶対的なスクリーン・座標を取得する関数
     function getTilePosition(index) {
       let x = canvas.width / 2;
       let y = canvas.height / 2;
@@ -503,7 +504,7 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       if (currentMap && currentMap.tiles.length > 0) {
-        // カメラの追従 (現在のピボットにスムースに追従)
+        // カメラの追従
         const pivotPos = getTilePosition(ballPivotIndex);
         cameraX += (pivotPos.x - cameraX) * 0.1;
         cameraY += (pivotPos.y - cameraY) * 0.1;
@@ -519,61 +520,52 @@
           const drawY = pos.y + offsetY;
 
           // BPM変更に基づいたカラーリング判定
-          let tileColor = '#4f46e5'; // 通常: indigo-600
-          let glowColor = 'rgba(79, 70, 229, 0.4)';
+          let tileColor = '#4f46e5'; // 通常
           
           if (i > 0) {
             const prevBpm = currentMap.tiles[i-1].bpm;
             if (tile.bpm > prevBpm) {
-              tileColor = '#e11d48'; // 加速: rose-600
-              glowColor = 'rgba(225, 29, 72, 0.5)';
+              tileColor = '#e11d48'; // 加速
             } else if (tile.bpm < prevBpm) {
-              tileColor = '#0284c7'; // 減速: sky-600
-              glowColor = 'rgba(2, 132, 199, 0.5)';
+              tileColor = '#0284c7'; // 減速
             }
           }
 
-          // 選択中のタイルの強調表示 (エディタモードのみ)
           const isSelected = (mode === 'edit' && selectedTileIndex === i);
           
-          // タイルの円形（あるいは角丸矩形）を描画
           ctx.beginPath();
           ctx.arc(drawX, drawY, isSelected ? 22 : 18, 0, Math.PI * 2);
           
           if (isSelected) {
-            ctx.fillStyle = '#10b981'; // emerald-500
+            ctx.fillStyle = '#10b981';
             ctx.fill();
             ctx.lineWidth = 4;
             ctx.strokeStyle = '#ffffff';
             ctx.stroke();
           } else {
-            ctx.fillStyle = '#0f172a'; // slate-900
+            ctx.fillStyle = '#0f172a';
             ctx.fill();
             ctx.lineWidth = 3;
             ctx.strokeStyle = tileColor;
             ctx.stroke();
           }
 
-          // 光彩エフェクト
           ctx.shadowBlur = isSelected ? 15 : 8;
           ctx.shadowColor = isSelected ? '#10b981' : tileColor;
 
-          // インデックスやBPM情報のテキスト
-          ctx.shadowBlur = 0; // テキスト描画時はシャドウ無効
+          ctx.shadowBlur = 0;
           ctx.fillStyle = '#94a3b8';
           ctx.font = 'bold 10px monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(tile.id, drawX, drawY);
 
-          // BPM変更箇所のラベル描画
           if (i === 0 || (i > 0 && tile.bpm !== currentMap.tiles[i-1].bpm)) {
             ctx.fillStyle = tileColor;
             ctx.font = 'bold 9px sans-serif';
             ctx.fillText(`${tile.bpm} BPM`, drawX, drawY - 28);
           }
 
-          // タイル同士を結ぶガイドラインの描画
           if (i < currentMap.tiles.length - 1) {
             const nextPos = getTilePosition(i + 1);
             ctx.beginPath();
@@ -587,21 +579,16 @@
 
         // 2. 回転する2つのボールの物理＆描画
         if (isGameRunning && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
-          // YouTubeの現在秒数を基準に進行させる
           const ytTime = ytPlayer.getCurrentTime();
-          
-          // トラベラーのリアルタイム角度更新
           updateBallPhysics(ytTime);
 
           const pivotTilePos = getTilePosition(ballPivotIndex);
           const px = pivotTilePos.x + offsetX;
           const py = pivotTilePos.y + offsetY;
 
-          // トラベラーの現在地算出
           const tx = px + Math.cos(travelerAngle) * TILE_DISTANCE;
           const ty = py + Math.sin(travelerAngle) * TILE_DISTANCE;
 
-          // ガイド接続線の描画（ピボットとトラベラーを繋ぐ）
           ctx.beginPath();
           ctx.moveTo(px, py);
           ctx.lineTo(tx, ty);
@@ -609,24 +596,21 @@
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
           ctx.stroke();
 
-          // ピボット(静止軸)ボール
           ctx.beginPath();
           ctx.arc(px, py, 12, 0, Math.PI * 2);
-          ctx.fillStyle = '#ef4444'; // 赤玉
+          ctx.fillStyle = '#ef4444';
           ctx.shadowBlur = 10;
           ctx.shadowColor = '#ef4444';
           ctx.fill();
 
-          // トラベラー(回転側)ボール
           ctx.beginPath();
           ctx.arc(tx, ty, 12, 0, Math.PI * 2);
-          ctx.fillStyle = '#3b82f6'; // 青玉
+          ctx.fillStyle = '#3b82f6';
           ctx.shadowBlur = 10;
           ctx.shadowColor = '#3b82f6';
           ctx.fill();
           ctx.shadowBlur = 0;
         } else {
-          // 非プレイ中：最初のタイル上にダミー表示
           const pos = getTilePosition(ballPivotIndex);
           const px = pos.x + offsetX;
           const py = pos.y + offsetY;
@@ -654,32 +638,23 @@
       if (!nextTile) return;
 
       const bpm = currentTile.bpm;
-      const beatDuration = 60 / bpm; // 1拍の秒数
+      const beatDuration = 60 / bpm;
 
-      // ADOFAI式判定理論：
-      // トラベラーは、前回のヒット時間から、今回のターゲット（次のタイル）に向かって回転する。
-      // 1拍（beatDuration）あたり、180度（Math.PIラジアン）移動する。
       const elapsed = currentTime - lastBeatTime;
       const angleDelta = (elapsed / beatDuration) * Math.PI;
 
-      // 前回のヒット確定時の初期進入角度をベースにする
       const startAngle = getIncomingAngle(); 
-      
-      // 回転方向に応じて加減算
       travelerAngle = startAngle + (angleDelta * rotationDir);
     }
 
-    // 前回の確定角度(ピボットと進行方向から算出)
     function getIncomingAngle() {
       if (currentTileIndex === 0) {
-        // スタート時は0度（右方向）の対面(180度)からスタートする
         return Math.PI;
       }
       const prevTile = currentMap.tiles[currentTileIndex - 1];
       const curTile = currentMap.tiles[currentTileIndex];
       if (!prevTile || curTile.angle === null) return Math.PI;
 
-      // 前回の配置角度の反対から回り始める
       return ((curTile.angle + 180) * Math.PI) / 180;
     }
 
@@ -688,26 +663,20 @@
       if (!isGameRunning) return;
 
       const nextTileIndex = currentTileIndex + 1;
-      if (nextTileIndex >= currentMap.tiles.length) return; // 終点
+      if (nextTileIndex >= currentMap.tiles.length) return;
 
       const currentTile = currentMap.tiles[currentTileIndex];
       const nextTile = currentMap.tiles[nextTileIndex];
 
-      // 目標とするジャスト角度(ラジアン)
       const targetAngleRad = (nextTile.angle * Math.PI) / 180;
       
-      // トラベラーの現在の角度を、目標角度との差が最小になるよう正規化
       let diff = travelerAngle - targetAngleRad;
-      // 角度を [-PI, PI] の範囲に収める
       diff = Math.atan2(Math.sin(diff), Math.cos(diff));
 
-      // 現在のBPMから、角度ズレを「秒数ズレ」に逆算
       const bpm = currentTile.bpm;
       const beatDuration = 60 / bpm;
-      // 角度のズレ比率から、時間のズレ(秒)を算出
       const timeDiff = (diff / Math.PI) * beatDuration;
 
-      // 判定処理
       const absDiff = Math.abs(timeDiff);
       let judge = "Perfect";
       let isOver = false;
@@ -726,27 +695,21 @@
         isOver = true;
       }
 
-      // 判定タグの表示更新
       showJudgeUI(judge, isOver);
 
       if (isOver) {
         triggerGameOver();
       } else {
-        // 成功時の進行処理
         currentTileIndex = nextTileIndex;
-        ballPivotIndex = nextTileIndex; // 軸の移動
-        
-        // 回転方向の交互切替 (本家風)
+        ballPivotIndex = nextTileIndex;
         rotationDir *= -1; 
         
-        // 現在のヒット時間を記録（YouTubeの時間をシンク）
         if (ytPlayer) {
           lastBeatTime = ytPlayer.getCurrentTime();
         }
         
         combo++;
         
-        // 終了判定
         if (currentTileIndex === currentMap.tiles.length - 1) {
           showJudgeUI("STAGE CLEAR!!", false);
           setTimeout(() => {
@@ -757,20 +720,18 @@
       }
     }
 
-    // 判定結果UIの描画・更新
     function showJudgeUI(judge, isOver) {
       const tag = document.getElementById('judge-tag');
       const comboTag = document.getElementById('combo-tag');
       tag.innerText = judge;
       tag.className = "text-3xl font-black tracking-widest uppercase transition-all duration-100 scale-100 opacity-100";
 
-      // 判定ごとのカラー
       if (judge === "Perfect") {
-        tag.style.color = '#10b981'; // emerald-500
+        tag.style.color = '#10b981';
       } else if (judge.includes("Orange")) {
-        tag.style.color = '#f59e0b'; // amber-500
+        tag.style.color = '#f59e0b';
       } else {
-        tag.style.color = '#ef4444'; // rose-500
+        tag.style.color = '#ef4444';
       }
 
       if (isOver) {
@@ -781,7 +742,6 @@
         comboTag.innerText = `COMBO ${combo}` + (orangeConsecutiveCount > 0 ? ` (Orange: ${orangeConsecutiveCount}/5)` : '');
       }
 
-      // 簡易アニメーションアウト
       setTimeout(() => {
         if (isGameRunning) {
           tag.className = "text-3xl font-black tracking-widest uppercase transition-all duration-300 scale-95 opacity-0";
@@ -803,17 +763,26 @@
       const countNum = document.getElementById('countdown-num');
       countNum.innerText = count;
 
-      // プレイヤーを最初期位置にセット
       currentTileIndex = 0;
       ballPivotIndex = 0;
       combo = 0;
       orangeConsecutiveCount = 0;
       rotationDir = 1;
 
-      // YouTubeを再生してミュート解除などの初期同期準備
+      // 【自動再生ポリシー回避処理】
+      // ユーザーのインタラクション契機に、一度ミュート解除して再生 ➔ 即時停止 ➔ シーク しておく
       if (ytPlayer && ytReady) {
-        ytPlayer.seekTo(0);
-        ytPlayer.pauseVideo();
+        try {
+          ytPlayer.unMute();
+          ytPlayer.setVolume(50);
+          ytPlayer.playVideo();
+          setTimeout(() => {
+            ytPlayer.pauseVideo();
+            ytPlayer.seekTo(0);
+          }, 60);
+        } catch (err) {
+          console.warn("YouTube control warning:", err);
+        }
       }
 
       const interval = setInterval(() => {
@@ -833,8 +802,17 @@
       document.getElementById('game-overlay').classList.add('opacity-0', 'pointer-events-none');
 
       if (ytPlayer && ytReady) {
-        ytPlayer.playVideo();
-        lastBeatTime = 0; // YouTubeのスタート時間
+        try {
+          ytPlayer.unMute();
+          ytPlayer.setVolume(50);
+          ytPlayer.seekTo(0);
+          ytPlayer.playVideo();
+        } catch (err) {
+          console.warn("YouTube start warning:", err);
+        }
+        lastBeatTime = ytPlayer.getCurrentTime() || 0;
+      } else {
+        lastBeatTime = 0;
       }
       isGameRunning = true;
     }
@@ -851,9 +829,8 @@
     function triggerGameOver() {
       stopGame();
       
-      // 進行率算出式
       const totalTiles = currentMap.tiles.length;
-      const clearedTiles = currentTileIndex; // 0番目始まりなので、現在インデックス＝クリアした数
+      const clearedTiles = currentTileIndex;
       const progress = totalTiles > 0 ? ((clearedTiles / totalTiles) * 100).toFixed(1) : 0;
 
       document.getElementById('start-view').classList.add('hidden');
@@ -865,7 +842,6 @@
       document.getElementById('progress-detail').innerText = `Tile ${clearedTiles} / ${totalTiles}`;
     }
 
-    // 広告や通信ラグによるポーズ
     function triggerAdPause() {
       isGameRunning = false;
       if (ytPlayer && ytReady) {
@@ -885,10 +861,8 @@
       const countNum = document.getElementById('countdown-num');
       countNum.innerText = count;
 
-      // YouTubeプレイヤーの現在時間を取得して位置を合わせる
       let resumeTime = 0;
       if (ytPlayer) {
-        // 現在秒数を少し戻して再スタートする
         resumeTime = Math.max(0, ytPlayer.getCurrentTime() - 1);
         ytPlayer.seekTo(resumeTime);
         ytPlayer.pauseVideo();
@@ -905,7 +879,7 @@
           
           if (ytPlayer) {
             ytPlayer.playVideo();
-            lastBeatTime = resumeTime; // 再開時タイムラグ補正
+            lastBeatTime = resumeTime;
           }
           isGameRunning = true;
         }
@@ -914,7 +888,6 @@
 
     // --- UI/UX更新 ---
     function updateUI() {
-      // 共通タイトル・BPMの表示
       document.getElementById('display-title').innerText = currentMap.title || "無題の譜面";
       document.getElementById('display-bpm').innerText = currentMap.tiles[0] ? `${currentMap.tiles[0].bpm}` : "--";
       
@@ -927,12 +900,10 @@
         document.getElementById('panel-edit').classList.remove('hidden');
         document.getElementById('editor-actions').classList.remove('hidden');
         
-        // エディタ専用パネル内情報の同期
         document.getElementById('editor-tile-count').innerText = `${currentMap.tiles.length} タイル`;
         renderEditorTileList();
       }
 
-      // YouTube プレイヤー表示先（背面・前面）のコントロール
       const ytContainer = document.getElementById('yt-player-container');
       const btnToggleYt = document.getElementById('btn-toggle-yt');
       if (isYtForeground) {
@@ -955,26 +926,24 @@
 
     function saveMetaModal() {
       currentMap.title = document.getElementById('meta-title').value || "無題の譜面";
-      currentMap.videoID = document.getElementById('meta-video-id').value || "Qd01-62VbE8";
+      currentMap.videoID = document.getElementById('meta-video-id').value || "K4DyBUG242c";
       currentMap.author = document.getElementById('meta-author').value || "Anonymous";
       currentMap.memo = document.getElementById('meta-memo').value || "";
 
       document.getElementById('modal-meta').classList.add('hidden');
       
-      // YouTubeプレイヤーの再ロード
       initPlayer(currentMap.videoID);
       updateUI();
     }
 
     function loadNewEditor() {
-      // 全く新しい譜面
       currentMap = {
         title: "新規作成譜面",
-        videoID: "Qd01-62VbE8",
+        videoID: "K4DyBUG242c",
         author: "クリエイター",
         memo: "新しい譜面です。",
         tiles: [
-          { id: 1, angle: null, bpm: 120 } // 最初は1枚だけ
+          { id: 1, angle: null, bpm: 120 }
         ]
       };
       selectedTileIndex = 0;
@@ -990,12 +959,10 @@
       updateUI();
     }
 
-    // 角度入力用30度刻みボタン生成
     function renderAngleButtons() {
       const container = document.getElementById('angle-buttons-container');
       container.innerHTML = "";
       
-      // 30度刻み (0から330度まで)
       for (let angle = 0; angle < 360; angle += 30) {
         const btn = document.createElement('button');
         btn.className = "py-1.5 bg-slate-900 hover:bg-slate-800 rounded font-mono font-bold text-slate-300 border border-slate-800 transition active:scale-95";
@@ -1014,7 +981,6 @@
       document.getElementById('edit-tile-id').value = tile.id;
       document.getElementById('edit-tile-bpm').value = tile.bpm;
 
-      // 選択アイテムの見た目更新
       const items = document.querySelectorAll('.tile-list-item');
       items.forEach((item, idx) => {
         if (idx === index) {
@@ -1038,7 +1004,6 @@
       const lastTile = currentMap.tiles[currentMap.tiles.length - 1];
       const newId = lastTile ? lastTile.id + 1 : 1;
       const defaultBpm = lastTile ? lastTile.bpm : 120;
-      // 追加時は前方のタイルの流れ(例えば0度：右)に合わせる
       currentMap.tiles.push({
         id: newId,
         angle: 0,
@@ -1059,7 +1024,6 @@
       }
       currentMap.tiles.splice(selectedTileIndex, 1);
       
-      // IDの再ナンバリング
       currentMap.tiles.forEach((t, i) => {
         t.id = i + 1;
       });
@@ -1091,7 +1055,6 @@
       });
     }
 
-    // --- JSON ファイルのインポート / エクスポート ---
     function exportMap() {
       const jsonStr = JSON.stringify(currentMap, null, 2);
       const blob = new Blob([jsonStr], { type: "application/json" });
@@ -1118,17 +1081,12 @@
             currentMap = imported;
             selectedTileIndex = 0;
             
-            // YouTubeプレイヤーの再初期化
             initPlayer(currentMap.videoID);
-            
-            // UIの更新とモード同期
             updateUI();
             
-            // スタート待機画面状態に戻す
             document.getElementById('overlay-title').innerText = currentMap.title;
             document.getElementById('overlay-desc').innerText = `作成者: ${currentMap.author}\n${currentMap.memo || ''}`;
             
-            // エディタモード中であれば、ツールを強制活性化
             if (mode === 'edit') {
               loadExistingToEditor();
             }
@@ -1146,28 +1104,23 @@
 
     // --- イベントリスナーのセットアップ ---
     function setupEventListeners() {
-      // 共通キーボードインプット制御
       window.addEventListener('keydown', (e) => {
-        // スペースキーまたはEnterキーを検知してアクション
         if (e.key === ' ' || e.key === 'Enter') {
-          e.preventDefault(); // YouTube、ブラウザのスクロール等のデフォルト干渉を完全カット
+          e.preventDefault();
 
           if (isGameRunning) {
             judgeInput();
           } else {
             if (isCountingDown) return;
-            // 待機画面・ゲームオーバー画面からの再開
             triggerStartCountdown();
           }
         }
 
-        // Rキーによる高速リトライ
         if (e.key === 'r' || e.key === 'R') {
           stopGame();
           triggerStartCountdown();
         }
 
-        // Pキーによるマニュアルシンク（ポーズ・再開）
         if (e.key === 'p' || e.key === 'P') {
           if (isGameRunning) {
             triggerAdPause();
@@ -1177,7 +1130,6 @@
         }
       });
 
-      // マウスクリックでの入力判定（キーボードが不便なプレイヤー向け）
       canvas.addEventListener('mousedown', (e) => {
         e.preventDefault();
         if (isGameRunning) {
@@ -1185,7 +1137,6 @@
         }
       });
 
-      // ボタンアクション
       document.getElementById('btn-mode-play').addEventListener('click', () => {
         mode = 'play';
         document.getElementById('btn-mode-play').className = "px-4 py-1.5 rounded-md text-sm font-bold transition bg-indigo-600 text-white shadow-lg";
@@ -1210,19 +1161,17 @@
 
       document.getElementById('file-import').addEventListener('change', importMap);
 
-      // ゲーム開始トリガー（オーバーレイ内）
       document.getElementById('btn-game-trigger').addEventListener('click', triggerStartCountdown);
       document.getElementById('btn-retry').addEventListener('click', triggerStartCountdown);
       document.getElementById('btn-resume-sync').addEventListener('click', resumeSync);
 
-      // デモ譜面ロードボタン
       document.getElementById('btn-load-demo').addEventListener('click', () => {
         document.getElementById('overlay-title').innerText = currentMap.title;
         document.getElementById('overlay-desc').innerText = `作成者: ${currentMap.author}\n${currentMap.memo}`;
+        initPlayer(currentMap.videoID); // ロード時に再度読み込み
         updateUI();
       });
 
-      // エディタボタン群
       document.getElementById('btn-editor-new').addEventListener('click', loadNewEditor);
       document.getElementById('btn-editor-load-exist').addEventListener('click', loadExistingToEditor);
       document.getElementById('btn-edit-meta').addEventListener('click', openMetaModal);
@@ -1230,14 +1179,12 @@
       document.getElementById('btn-add-tile').addEventListener('click', addTile);
       document.getElementById('btn-delete-tile').addEventListener('click', deleteSelectedTile);
 
-      // エディタフォーム更新
       document.getElementById('edit-tile-bpm').addEventListener('input', (e) => {
         const bpm = parseInt(e.target.value) || 120;
         currentMap.tiles[selectedTileIndex].bpm = bpm;
         updateUI();
       });
 
-      // メタモーダルボタン
       document.getElementById('btn-meta-cancel').addEventListener('click', () => {
         document.getElementById('modal-meta').classList.add('hidden');
       });
