@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>ADOFAI Style Rhythm Game</title>
+    <title>ADOFAI Style Web Game v2</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -28,7 +28,7 @@
             background: #2b2b2b;
             padding: 20px;
             border-radius: 8px;
-            width: 300px;
+            width: 320px;
             display: flex;
             flex-direction: column;
             gap: 15px;
@@ -56,19 +56,13 @@
         button:hover {
             background: #0056b3;
         }
-        .direction-buttons {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
+        .angle-selector {
+            display: flex;
             gap: 5px;
-        }
-        .direction-buttons button {
-            background: #555;
-        }
-        .direction-buttons button:hover {
-            background: #777;
+            align-items: center;
         }
         #chart-list {
-            max-height: 150px;
+            max-height: 120px;
             overflow-y: auto;
             background: #111;
             padding: 5px;
@@ -78,7 +72,7 @@
 </head>
 <body>
 
-    <h1>ADOFAI Style Web Game</h1>
+    <h1>ADOFAI Style Web Game (2 Balls & 30° Snapping)</h1>
     
     <div id="player"></div>
 
@@ -86,7 +80,7 @@
         <div>
             <canvas id="gameCanvas" width="600" height="400"></canvas>
             <div style="margin-top: 10px; text-align: center;">
-                <p>Spaceキーでタイミングよくクリック！</p>
+                <p>Spaceキーまたはキーボードのキーを押してタイミングよくクリック！</p>
                 <h3 id="score-text">Hit: 0 / Total: 0</h3>
             </div>
         </div>
@@ -95,7 +89,7 @@
             <h3>譜面設定</h3>
             <label>
                 YouTube 動画ID:
-                <input type="text" id="youtube-id" value="dQw4w9WgXcQ" placeholder="動画URLの v= 以降の文字列">
+                <input type="text" id="youtube-id" value="dQw4w9WgXcQ">
             </label>
             <label>
                 基本BPM:
@@ -105,21 +99,27 @@
 
             <hr style="border: 0.5px solid #444; width: 100%;">
 
-            <h3>ノーツ追加 (エディタ)</h3>
-            <p style="font-size: 12px; color: #aaa;">動画を再生し、タイミングを合わせて方向ボタンを押すとノーツが追加されます。</p>
-            <div class="direction-buttons">
-                <td></td>
-                <button onclick="addNote('UP')">↑ (上)</button>
-                <td></td>
-                <button onclick="addNote('LEFT')">← (左)</button>
-                <button style="background:#222; cursor:default;"></button>
-                <button onclick="addNote('RIGHT')">→ (右)</button>
-                <td></td>
-                <button onclick="addNote('DOWN')">↓ (下)</button>
-                <td></td>
+            <h3>ノーツ追加 (30°刻み)</h3>
+            <p style="font-size: 11px; color: #aaa;">動画再生中に角度を選んで「追加」を押します。<br>(0°=右, 90°=上, 180°=左, 270°=下)</p>
+            <div class="angle-selector">
+                <select id="angle-input">
+                    <option value="0">0° (右)</option>
+                    <option value="30">30°</option>
+                    <option value="60">60°</option>
+                    <option value="90">90° (上)</option>
+                    <option value="120">120°</option>
+                    <option value="150">150°</option>
+                    <option value="180">180° (左)</option>
+                    <option value="210">210°</option>
+                    <option value="240">240°</option>
+                    <option value="270">270° (下)</option>
+                    <option value="300">300°</option>
+                    <option value="315">330°</option>
+                </select>
+                <button onclick="addNoteFromInput()" style="flex-grow: 1;">ノーツ追加</button>
             </div>
 
-            <div id="chart-list">追加されたノーツがここに表示されます</div>
+            <div id="chart-list">ここに譜面データが表示されます</div>
 
             <hr style="border: 0.5px solid #444; width: 100%;">
 
@@ -134,38 +134,36 @@
     <script src="https://www.youtube.com/iframe_api"></script>
 
     <script>
-        // --- ゲーム状態管理 ---
         let player;
         let bpm = 120;
-        let chart = []; // { time: 秒, dir: 方向 }
+        let chart = []; // { time: 秒, angle: 度 }
         let currentNoteIndex = 0;
         let score = 0;
 
-        // ボール（プレイヤー）の位置と回転
-        let ball = { x: 300, y: 200, angle: 0, radius: 15, speed: 0.05 };
-        let pivot = { x: 300, y: 200 }; // 回転の基準点
-        let pathPoints = [{ x: 300, y: 200 }]; // パスの座標履歴
+        // タイル（パス）の座標
+        let pathPoints = [{ x: 300, y: 200 }];
+        const TILE_DISTANCE = 50; // タイル間の距離
+
+        // 2つのボールのデータ
+        let ballRed = { x: 300, y: 200, color: '#ff4757' };
+        let ballBlue = { x: 250, y: 200, color: '#54a0ff' };
+        
+        // どちらが回転しているか (0: 赤が回転/青が固定, 1: 青が回転/赤が固定)
+        let activeBall = 0; 
+        let currentAngle = 0; // 現在の回転角(ラジアン)
 
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
-        // --- YouTube API 初期化 ---
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', {
-                height: '200',
-                width: '300',
+                height: '160',
+                width: '320',
                 videoId: document.getElementById('youtube-id').value,
-                events: {
-                    'onReady': onPlayerReady
-                }
+                events: { 'onReady': () => console.log("Player Ready") }
             });
         }
 
-        function onPlayerReady(event) {
-            console.log("YouTube Player Ready");
-        }
-
-        // 動画リロード
         document.getElementById('load-video-btn').addEventListener('click', () => {
             const videoId = document.getElementById('youtube-id').value;
             bpm = parseFloat(document.getElementById('base-bpm').value) || 120;
@@ -176,136 +174,146 @@
         });
 
         // --- エディタ機能 ---
-        function addNote(direction) {
+        function addNoteFromInput() {
             if (!player || typeof player.getCurrentTime !== 'function') return;
             const currentTime = player.getCurrentTime();
+            const angleDeg = parseFloat(document.getElementById('angle-input').value);
             
-            chart.push({ time: currentTime, dir: direction });
-            // 時間順にソート
+            chart.push({ time: currentTime, angle: angleDeg });
             chart.sort((a, b) => a.time - b.time);
             
             updateChartList();
-            generatePath(); // パスを再計算
+            generatePath();
         }
 
         function updateChartList() {
             const listDiv = document.getElementById('chart-list');
-            listDiv.innerHTML = chart.map((n, i) => `[${i}] ${n.time.toFixed(2)}秒: ${n.dir}`).join('<br>');
+            listDiv.innerHTML = chart.map((n, i) => `[${i}] ${n.time.toFixed(2)}s: ${n.angle}°`).join('<br>');
         }
 
         function resetGame() {
             currentNoteIndex = 0;
             score = 0;
-            ball.x = 300;
-            ball.y = 200;
-            ball.angle = 0;
-            pivot.x = 300;
-            pivot.y = 200;
+            activeBall = 0; 
             document.getElementById('score-text').innerText = `Hit: 0 / Total: ${chart.length}`;
             generatePath();
         }
 
-        // 譜面（JSON）に基づいてマス目の位置を事前に計算
+        // 30°間隔の角度情報から、タイル（マス）の座標を一本道として計算
         function generatePath() {
-            pathPoints = [{ x: 300, y: 200 }];
-            let curX = 300;
-            let curY = 200;
-            const step = 50; // マス目間の距離
+            pathPoints = [{ x: 200, y: 250 }]; // スタート位置
+            let curX = 200;
+            let curY = 250;
 
             chart.forEach(note => {
-                if (note.dir === 'RIGHT') curX += step;
-                else if (note.dir === 'LEFT') curX -= step;
-                else if (note.dir === 'UP') curY -= step;
-                else if (note.dir === 'DOWN') curY += step;
+                // ADOFAIはベースが右(0度)で反時計回りに角度が進むため、ラジアンに変換
+                // CanvasのY軸は下方向が正なので、マイナスをかけて上下を反転
+                const rad = (note.angle * Math.PI) / 180;
+                curX += Math.cos(rad) * TILE_DISTANCE;
+                curY -= Math.sin(rad) * TILE_DISTANCE; 
                 pathPoints.push({ x: curX, y: curY });
             });
         }
 
-        // --- ゲームループ & 描画 ---
+        // --- ゲームループ ---
         function gameLoop() {
             requestAnimationFrame(gameLoop);
             if (!player || typeof player.getPlayerState !== 'function') return;
             
-            // 再生中のみボールを回転させる
             if (player.getPlayerState() === YT.PlayerState.PLAYING) {
-                // BPMに応じた回転速度の計算 (1分間にBPM回、1周する)
-                // ADOFAIは1拍で180度（πラジアン）進むのが基本なのでそれに合わせる
                 const timeSec = player.getCurrentTime();
+                // 1拍（BPM）で180度(πラジアン)回転する計算
                 const radiansPerSecond = (bpm / 60) * Math.PI;
-                ball.angle = timeSec * radiansPerSecond;
                 
-                // 現在のターゲットマスをもとに、回転中心（ピボット）を決定
-                if (currentNoteIndex < pathPoints.length) {
-                    pivot.x = pathPoints[currentNoteIndex].x;
-                    pivot.y = pathPoints[currentNoteIndex].y;
+                // ターンごとに回転方向が交互に入れ替わる本家仕様を再現
+                // (activeBallの偶奇によって回転の向きを制御)
+                if (activeBall === 0) {
+                    currentAngle = timeSec * radiansPerSecond;
+                } else {
+                    currentAngle = -timeSec * radiansPerSecond;
                 }
 
-                // ボールの位置を計算（ピボットの周りをまわる）
-                const radius = 25; // 回転半径
-                ball.x = pivot.x + Math.cos(ball.angle) * radius;
-                ball.y = pivot.y + Math.sin(ball.angle) * radius;
+                // 固定されている側（ピボット）の位置を基準に、もう一方を回転させる
+                if (currentNoteIndex < pathPoints.length) {
+                    const pivot = pathPoints[currentNoteIndex];
+                    
+                    if (activeBall === 0) {
+                        // 青が固定、赤が回転
+                        ballBlue.x = pivot.x;
+                        ballBlue.y = pivot.y;
+                        ballRed.x = pivot.x + Math.cos(currentAngle) * TILE_DISTANCE;
+                        ballRed.y = pivot.y + Math.sin(currentAngle) * TILE_DISTANCE;
+                    } else {
+                        // 赤が固定、青が回転
+                        ballRed.x = pivot.x;
+                        ballRed.y = pivot.y;
+                        ballBlue.x = pivot.x + Math.cos(currentAngle) * TILE_DISTANCE;
+                        ballBlue.y = pivot.y + Math.sin(currentAngle) * TILE_DISTANCE;
+                    }
+                }
             }
 
-            // 描画処理
+            // 描画
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 1. マス目（ライン）の描画
+            // 1. タイル（ライン）描画
             if (pathPoints.length > 0) {
                 ctx.beginPath();
-                ctx.strokeStyle = '#555';
-                ctx.lineWidth = 6;
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 8;
                 ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
                 for (let i = 1; i < pathPoints.length; i++) {
                     ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
                 }
                 ctx.stroke();
 
-                // 各マス目の点
                 pathPoints.forEach((pt, idx) => {
                     ctx.beginPath();
-                    ctx.fillStyle = idx === currentNoteIndex ? '#ffc107' : '#fff';
-                    ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
+                    ctx.fillStyle = idx === currentNoteIndex + 1 ? '#ff9f43' : (idx <= currentNoteIndex ? '#555' : '#fff');
+                    ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2);
                     ctx.fill();
+                    ctx.strokeStyle = '#aaa';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
                 });
             }
 
-            // 2. 回転するボールの描画
+            // 2. 2つのボールを描画
             ctx.beginPath();
-            ctx.fillStyle = '#ff4757'; // 火の玉イメージの赤
-            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = ballBlue.color;
+            ctx.arc(ballBlue.x, ballBlue.y, 12, 0, Math.PI * 2);
             ctx.fill();
-            
-            // 中心点（青い球も重ねるのが本家風ですが、今回はシンプルに1個で回転）
+
             ctx.beginPath();
-            ctx.fillStyle = '#2ed573';
-            ctx.arc(pivot.x, pivot.y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = ballRed.color;
+            ctx.arc(ballRed.x, ballRed.y, 12, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // --- 入力判定 (Spaceキー) ---
+        // --- 判定処理 ---
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                e.preventDefault(); // スクロール防止
-                
-                if (currentNoteIndex >= chart.length) return;
+            // エディタの入力欄にフォーカスがある時はゲームのキー入力を無効化
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
 
-                const currentTime = player.getCurrentTime();
-                const targetTime = chart[currentNoteIndex].time;
-                const diff = Math.abs(currentTime - targetTime);
+            if (currentNoteIndex >= chart.length) return;
 
-                // 判定幅 (例: 0.15秒以内ならGood)
-                if (diff < 0.15) {
-                    score++;
-                    currentNoteIndex++;
-                    document.getElementById('score-text').innerText = `Hit: ${score} / Total: ${chart.length}`;
-                } else {
-                    console.log("Miss! ズレ:", diff);
-                }
+            const currentTime = player.getCurrentTime();
+            const targetTime = chart[currentNoteIndex].time;
+            const diff = Math.abs(currentTime - targetTime);
+
+            // 判定（0.15秒以内なら成功）
+            if (diff < 0.15) {
+                score++;
+                currentNoteIndex++;
+                // 成功したら回転するボールを入れ替える（交代）
+                activeBall = activeBall === 0 ? 1 : 0;
+                document.getElementById('score-text').innerText = `Hit: ${score} / Total: ${chart.length}`;
+            } else {
+                console.log("Miss! ズレ秒:", diff.toFixed(3));
             }
         });
 
-        // --- JSONの保存と読み込み ---
-        // ダウンロード
+        // --- JSON 保存＆読込 ---
         document.getElementById('download-json-btn').addEventListener('click', () => {
             const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
                 youtubeId: document.getElementById('youtube-id').value,
@@ -314,17 +322,15 @@
             }, null, 2));
             const downloadAnchor = document.createElement('a');
             downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "adofai_chart.json");
+            downloadAnchor.setAttribute("download", "adofai_30deg_chart.json");
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
             downloadAnchor.remove();
         });
 
-        // アップロード（インポート）
         document.getElementById('upload-json').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
             const reader = new FileReader();
             reader.onload = function(evt) {
                 try {
@@ -333,21 +339,17 @@
                     document.getElementById('base-bpm').value = parsed.bpm || 120;
                     bpm = parsed.bpm || 120;
                     chart = parsed.chart || [];
-                    
                     updateChartList();
-                    if (player && player.loadVideoById) {
-                        player.loadVideoById(parsed.youtubeId);
-                    }
+                    if (player && player.loadVideoById) player.loadVideoById(parsed.youtubeId);
                     resetGame();
-                    alert("譜面を読み込みました！");
+                    alert("30°対応譜面を読み込みました！");
                 } catch (err) {
-                    alert("JSONファイルの形式が正しくありません。");
+                    alert("JSONファイルが不正です。");
                 }
             };
             reader.readAsText(file);
         });
 
-        // ループ開始
         requestAnimationFrame(gameLoop);
     </script>
 </body>
