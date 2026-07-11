@@ -356,6 +356,7 @@
     let ytPlayer = null;
     let ytReady = false;
     let ytState = -1; // YouTube PlayerState
+    let stateCheckGracePeriod = false; // 再生開始時のステータス検知猶予フラグ
 
     // 現在展開中の譜面（JSON）
     let currentMap = {
@@ -430,6 +431,7 @@
         width: '100%',
         videoId: videoId,
         playerVars: {
+          enablejsapi: 1,
           playsinline: 1,
           controls: 0,
           disablekb: 1,
@@ -454,10 +456,18 @@
     function onPlayerStateChange(event) {
       ytState = event.data;
       
-      // 広告、または動画一時停止によるズレ検知
-      if (isGameRunning) {
+      // 猶予期間中でない場合のみ、再生中断による広告・遅延検知を行う
+      if (isGameRunning && !stateCheckGracePeriod) {
         if (ytState === YT.PlayerState.PAUSED || ytState === YT.PlayerState.BUFFERING) {
-          triggerAdPause();
+          // 瞬間的なバッファリングや状態変化のノイズを除外するため、少しディレイを挟んで再検知する
+          setTimeout(() => {
+            if (isGameRunning && !stateCheckGracePeriod) {
+              const currentState = ytPlayer.getPlayerState();
+              if (currentState === YT.PlayerState.PAUSED || currentState === YT.PlayerState.BUFFERING) {
+                triggerAdPause();
+              }
+            }
+          }, 800);
         }
       }
     }
@@ -580,6 +590,23 @@
         // 2. 回転する2つのボールの物理＆描画
         if (isGameRunning && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
           const ytTime = ytPlayer.getCurrentTime();
+
+          // お見逃し（完全にタイミングを逃して1周以上オーバー回転したとき）の検出ロジック
+          const currentTile = currentMap.tiles[currentTileIndex];
+          const nextTile = currentMap.tiles[currentTileIndex + 1];
+          if (nextTile) {
+            const bpm = currentTile.bpm;
+            const beatDuration = 60 / bpm;
+            const elapsed = ytTime - lastBeatTime;
+
+            // 1拍の回転時間を大幅に過ぎ、さらにRedの遅れ許容値(0.5秒)を超えた場合はミスと判定する
+            if (elapsed > beatDuration + 0.5) {
+              showJudgeUI("Miss (Red)", true);
+              triggerGameOver();
+              return;
+            }
+          }
+
           updateBallPhysics(ytTime);
 
           const pivotTilePos = getTilePosition(ballPivotIndex);
@@ -770,7 +797,7 @@
       rotationDir = 1;
 
       // 【自動再生ポリシー回避処理】
-      // ユーザーのインタラクション契機に、一度ミュート解除して再生 ➔ 即時停止 ➔ シーク しておく
+      // ユーザーのインタラクション契機に、一度再生 ➔ 即時停止 ➔ シーク しておく
       if (ytPlayer && ytReady) {
         try {
           ytPlayer.unMute();
@@ -779,7 +806,7 @@
           setTimeout(() => {
             ytPlayer.pauseVideo();
             ytPlayer.seekTo(0);
-          }, 60);
+          }, 80);
         } catch (err) {
           console.warn("YouTube control warning:", err);
         }
@@ -801,12 +828,25 @@
       document.getElementById('countdown-view').classList.add('hidden');
       document.getElementById('game-overlay').classList.add('opacity-0', 'pointer-events-none');
 
+      // 開始時に猶予期間（グレースピリオド）をONにして、バッファリングなどの一時中断を無視する
+      stateCheckGracePeriod = true;
+      setTimeout(() => {
+        stateCheckGracePeriod = false;
+      }, 2000);
+
       if (ytPlayer && ytReady) {
         try {
           ytPlayer.unMute();
           ytPlayer.setVolume(50);
           ytPlayer.seekTo(0);
           ytPlayer.playVideo();
+          
+          // 再生のフェイルセーフ：万が一再生コマンドが無視された場合のために再トリガー
+          setTimeout(() => {
+            if (ytPlayer.getPlayerState() !== YT.PlayerState.PLAYING) {
+              ytPlayer.playVideo();
+            }
+          }, 150);
         } catch (err) {
           console.warn("YouTube start warning:", err);
         }
@@ -843,6 +883,9 @@
     }
 
     function triggerAdPause() {
+      // 猶予期間中であれば誤検知のため無視する
+      if (stateCheckGracePeriod) return;
+
       isGameRunning = false;
       if (ytPlayer && ytReady) {
         ytPlayer.pauseVideo();
@@ -860,6 +903,12 @@
       let count = 3;
       const countNum = document.getElementById('countdown-num');
       countNum.innerText = count;
+
+      // 同期再開時も、猶予期間（グレースピリオド）をONにする
+      stateCheckGracePeriod = true;
+      setTimeout(() => {
+        stateCheckGracePeriod = false;
+      }, 2000);
 
       let resumeTime = 0;
       if (ytPlayer) {
