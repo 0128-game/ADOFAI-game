@@ -492,6 +492,19 @@
       canvas.height = canvas.parentElement.clientHeight;
     }
 
+    // --- インデックス安全調整用ヘルパー ---
+    function clampIndices() {
+      const maxIdx = currentMap.tiles.length - 1;
+      
+      if (selectedTileIndex > maxIdx) selectedTileIndex = maxIdx;
+      if (currentTileIndex > maxIdx) currentTileIndex = maxIdx;
+      if (ballPivotIndex > maxIdx) ballPivotIndex = maxIdx;
+      
+      if (selectedTileIndex < 0) selectedTileIndex = 0;
+      if (currentTileIndex < 0) currentTileIndex = 0;
+      if (ballPivotIndex < 0) ballPivotIndex = 0;
+    }
+
     // --- 描画ロジック ---
     function getTilePosition(index) {
       let x = canvas.width / 2;
@@ -515,7 +528,8 @@
 
       if (currentMap && currentMap.tiles.length > 0) {
         // カメラの追従
-        const pivotPos = getTilePosition(ballPivotIndex);
+        const displayPivot = Math.min(Math.max(0, (mode === 'edit' ? selectedTileIndex : ballPivotIndex)), currentMap.tiles.length - 1);
+        const pivotPos = getTilePosition(displayPivot);
         cameraX += (pivotPos.x - cameraX) * 0.1;
         cameraY += (pivotPos.y - cameraY) * 0.1;
 
@@ -640,7 +654,9 @@
           ctx.fill();
           ctx.shadowBlur = 0;
         } else {
-          const pos = getTilePosition(ballPivotIndex);
+          // 非プレイ中：現在選択されている(またはプレイ用の)ピボットを基準にする
+          const displayPivot = Math.min(Math.max(0, (mode === 'edit' ? selectedTileIndex : ballPivotIndex)), currentMap.tiles.length - 1);
+          const pos = getTilePosition(displayPivot);
           const px = pos.x + offsetX;
           const py = pos.y + offsetY;
           
@@ -998,6 +1014,7 @@
         ]
       };
       selectedTileIndex = 0;
+      clampIndices();
       document.getElementById('edit-mode-select').classList.add('hidden');
       document.getElementById('editor-tools').classList.remove('hidden');
       openMetaModal();
@@ -1007,6 +1024,7 @@
       document.getElementById('edit-mode-select').classList.add('hidden');
       document.getElementById('editor-tools').classList.remove('hidden');
       selectedTileIndex = 0;
+      clampIndices();
       updateUI();
     }
 
@@ -1027,14 +1045,15 @@
 
     function selectTile(index) {
       selectedTileIndex = index;
-      const tile = currentMap.tiles[index];
+      clampIndices();
+      const tile = currentMap.tiles[selectedTileIndex];
       
       document.getElementById('edit-tile-id').value = tile.id;
       document.getElementById('edit-tile-bpm').value = tile.bpm;
 
       const items = document.querySelectorAll('.tile-list-item');
       items.forEach((item, idx) => {
-        if (idx === index) {
+        if (idx === selectedTileIndex) {
           item.classList.add('border-emerald-500', 'bg-emerald-950/20');
         } else {
           item.classList.remove('border-emerald-500', 'bg-emerald-950/20');
@@ -1061,6 +1080,7 @@
         bpm: defaultBpm
       });
       selectedTileIndex = currentMap.tiles.length - 1;
+      clampIndices();
       updateUI();
     }
 
@@ -1080,6 +1100,7 @@
       });
 
       selectedTileIndex = Math.max(0, selectedTileIndex - 1);
+      clampIndices();
       updateUI();
     }
 
@@ -1131,6 +1152,7 @@
           if (imported.tiles && Array.isArray(imported.tiles)) {
             currentMap = imported;
             selectedTileIndex = 0;
+            clampIndices();
             
             initPlayer(currentMap.videoID);
             updateUI();
@@ -1195,14 +1217,13 @@
         
         stopGame();
         
-        // 【修正】エディターで選択されていた位置等に関わらず、
-        // プレイモード選択時にボールとカメラの位置をスタート地点（id:1）に確実にリセットする
         currentTileIndex = 0;
         ballPivotIndex = 0;
         combo = 0;
         orangeConsecutiveCount = 0;
         rotationDir = 1;
         
+        clampIndices();
         updateUI();
       });
 
@@ -1210,7 +1231,9 @@
         mode = 'edit';
         document.getElementById('btn-mode-edit').className = "px-4 py-1.5 rounded-md text-sm font-bold transition bg-emerald-600 text-white shadow-lg";
         document.getElementById('btn-mode-play').className = "px-4 py-1.5 rounded-md text-sm font-bold transition text-slate-400 hover:text-white";
+        
         stopGame();
+        clampIndices();
         updateUI();
         renderAngleButtons();
       });
