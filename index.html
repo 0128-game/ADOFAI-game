@@ -1,356 +1,1248 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>ADOFAI Style Web Game v2</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #1a1a1a;
-            color: #fff;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        #game-container {
-            display: flex;
-            gap: 20px;
-            margin-top: 20px;
-        }
-        canvas {
-            background: #111;
-            border: 2px solid #444;
-            border-radius: 8px;
-        }
-        .controls {
-            background: #2b2b2b;
-            padding: 20px;
-            border-radius: 8px;
-            width: 320px;
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
-        }
-        label {
-            display: flex;
-            flex-direction: column;
-            font-size: 14px;
-            color: #ccc;
-        }
-        input, select, button {
-            margin-top: 5px;
-            padding: 8px;
-            border-radius: 4px;
-            border: 1px solid #444;
-            background: #444;
-            color: #fff;
-        }
-        button {
-            cursor: pointer;
-            background: #007bff;
-            border: none;
-            font-weight: bold;
-        }
-        button:hover {
-            background: #0056b3;
-        }
-        .angle-selector {
-            display: flex;
-            gap: 5px;
-            align-items: center;
-        }
-        #chart-list {
-            max-height: 120px;
-            overflow-y: auto;
-            background: #111;
-            padding: 5px;
-            font-size: 12px;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rhythm Orbit (ADOFAI Style)</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* プレイ画面のキャンバス発光エフェクト */
+    canvas {
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+    }
+    /* YouTubeプレイヤーの表示切り替えアニメーション */
+    .yt-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      opacity: 0.15;
+      pointer-events: none;
+    }
+    .yt-fg {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16/9;
+      z-index: 10;
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
 </head>
-<body>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans overflow-x-hidden">
 
-    <h1>ADOFAI Style Web Game (2 Balls & 30° Snapping)</h1>
-    
-    <div id="player"></div>
-
-    <div id="game-container">
-        <div>
-            <canvas id="gameCanvas" width="600" height="400"></canvas>
-            <div style="margin-top: 10px; text-align: center;">
-                <p>Spaceキーまたはキーボードのキーを押してタイミングよくクリック！</p>
-                <h3 id="score-text">Hit: 0 / Total: 0</h3>
-            </div>
-        </div>
-
-        <div class="controls">
-            <h3>譜面設定</h3>
-            <label>
-                YouTube 動画ID:
-                <input type="text" id="youtube-id" value="dQw4w9WgXcQ">
-            </label>
-            <label>
-                基本BPM:
-                <input type="number" id="base-bpm" value="120">
-            </label>
-            <button id="load-video-btn">動画を読み込む/リセット</button>
-
-            <hr style="border: 0.5px solid #444; width: 100%;">
-
-            <h3>ノーツ追加 (30°刻み)</h3>
-            <p style="font-size: 11px; color: #aaa;">動画再生中に角度を選んで「追加」を押します。<br>(0°=右, 90°=上, 180°=左, 270°=下)</p>
-            <div class="angle-selector">
-                <select id="angle-input">
-                    <option value="0">0° (右)</option>
-                    <option value="30">30°</option>
-                    <option value="60">60°</option>
-                    <option value="90">90° (上)</option>
-                    <option value="120">120°</option>
-                    <option value="150">150°</option>
-                    <option value="180">180° (左)</option>
-                    <option value="210">210°</option>
-                    <option value="240">240°</option>
-                    <option value="270">270° (下)</option>
-                    <option value="300">300°</option>
-                    <option value="315">330°</option>
-                </select>
-                <button onclick="addNoteFromInput()" style="flex-grow: 1;">ノーツ追加</button>
-            </div>
-
-            <div id="chart-list">ここに譜面データが表示されます</div>
-
-            <hr style="border: 0.5px solid #444; width: 100%;">
-
-            <button id="download-json-btn" style="background: #28a745;">JSONをダウンロード</button>
-            <label style="margin-top: 5px;">
-                JSON譜面を読み込み:
-                <input type="file" id="upload-json" accept=".json">
-            </label>
-        </div>
+  <!-- ヘッダー / タイトルバー -->
+  <header class="bg-slate-900 border-b border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-4 z-20 shadow-md">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-rose-500 flex items-center justify-center animate-pulse">
+        <i class="fa-solid fa-circle-notch text-xl text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-black tracking-wider bg-gradient-to-r from-indigo-400 via-purple-400 to-rose-400 bg-clip-text text-transparent">
+          RHYTHM ORBIT
+        </h1>
+        <p class="text-xs text-slate-400">ADOFAI Style Rhythm Game</p>
+      </div>
     </div>
 
-    <script src="https://www.youtube.com/iframe_api"></script>
+    <!-- モード・設定コントローラー -->
+    <div class="flex flex-wrap items-center gap-3">
+      <!-- モード切替 -->
+      <div class="bg-slate-950 p-1 rounded-lg border border-slate-800 flex">
+        <button id="btn-mode-play" class="px-4 py-1.5 rounded-md text-sm font-bold transition bg-indigo-600 text-white shadow-lg">
+          <i class="fa-solid fa-play mr-1.5"></i>プレイ
+        </button>
+        <button id="btn-mode-edit" class="px-4 py-1.5 rounded-md text-sm font-bold transition text-slate-400 hover:text-white">
+          <i class="fa-solid fa-pen mr-1.5"></i>譜面作成
+        </button>
+      </div>
 
-    <script>
-        let player;
-        let bpm = 120;
-        let chart = []; // { time: 秒, angle: 度 }
-        let currentNoteIndex = 0;
-        let score = 0;
+      <!-- プレイヤー表示設定 -->
+      <button id="btn-toggle-yt" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border border-slate-700">
+        <i class="fa-brands fa-youtube text-rose-500"></i>
+        <span>YouTube: 背面</span>
+      </button>
 
-        // タイル（パス）の座標
-        let pathPoints = [{ x: 300, y: 200 }];
-        const TILE_DISTANCE = 50; // タイル間の距離
+      <!-- 譜面読み込み（共通） -->
+      <label class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border border-slate-700">
+        <i class="fa-solid fa-file-import text-indigo-400"></i>
+        <span>譜面読込</span>
+        <input type="file" id="file-import" class="hidden" accept=".json">
+      </label>
 
-        // 2つのボールのデータ
-        let ballRed = { x: 300, y: 200, color: '#ff4757' };
-        let ballBlue = { x: 250, y: 200, color: '#54a0ff' };
+      <!-- エディタ専用機能（初期非表示） -->
+      <div id="editor-actions" class="hidden flex items-center gap-2">
+        <button id="btn-edit-meta" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border border-slate-700">
+          <i class="fa-solid fa-gear text-emerald-400"></i>譜面情報編集
+        </button>
+        <button id="btn-export" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-md">
+          <i class="fa-solid fa-file-export"></i>譜面書き出し
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ領域 -->
+  <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 max-w-7xl mx-auto w-full relative">
+    
+    <!-- 左半分：ゲームゾーン＆動画表示 (8/12) -->
+    <div class="lg:col-span-8 flex flex-col gap-6 min-w-0">
+      
+      <!-- YouTube プレーヤーコンテナ -->
+      <div id="yt-player-container" class="yt-bg rounded-2xl overflow-hidden shadow-2xl border border-slate-800 bg-black transition-all duration-300">
+        <div id="yt-iframe-placeholder"></div>
+      </div>
+
+      <!-- メインゲームエリア（Canvas） -->
+      <div class="relative bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-xl flex-1 min-h-[450px] flex flex-col">
+        <!-- 案内ヘッダー -->
+        <div class="absolute top-4 left-4 right-4 flex justify-between items-center z-10 pointer-events-none">
+          <div class="bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800">
+            <span class="text-xs text-slate-400 mr-2">現在曲:</span>
+            <span id="display-title" class="text-sm font-bold text-slate-200">読み込まれていません</span>
+          </div>
+          <div class="flex gap-2">
+            <div class="bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-800 text-right">
+              <span class="text-xs text-slate-400">BPM:</span>
+              <span id="display-bpm" class="text-sm font-bold text-indigo-400">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ゲーム画面キャンバス -->
+        <canvas id="game-canvas" class="w-full flex-1 block cursor-crosshair bg-slate-950"></canvas>
+
+        <!-- スタート/ポーズ/判定オーバーレイ -->
+        <div id="game-overlay" class="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6 z-10 transition-all duration-300">
+          <!-- カウントダウン -->
+          <div id="countdown-view" class="hidden">
+            <div id="countdown-num" class="text-8xl font-black text-indigo-500 animate-ping">3</div>
+            <p class="text-sm text-slate-400 mt-4">まもなくスタートします...</p>
+          </div>
+
+          <!-- タイトル画面 / 待機状態 -->
+          <div id="start-view" class="flex flex-col items-center">
+            <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mb-4 text-indigo-400 text-2xl">
+              <i class="fa-solid fa-music"></i>
+            </div>
+            <h2 id="overlay-title" class="text-2xl font-bold mb-2">譜面を読み込んでください</h2>
+            <p id="overlay-desc" class="text-sm text-slate-400 mb-6 max-w-md">プレイを始めるには、譜面ファイルを読み込むか、初期デモ譜面をロードしてください。</p>
+            <div class="flex gap-4">
+              <button id="btn-load-demo" class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-bold transition border border-slate-700">
+                デモ譜面をロード
+              </button>
+              <button id="btn-game-trigger" class="hidden px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-indigo-500/20">
+                ゲーム開始 <kbd class="ml-2 px-1.5 py-0.5 bg-indigo-800 rounded text-xs">Space / Enter</kbd>
+              </button>
+            </div>
+          </div>
+
+          <!-- ゲームオーバー / リザルト画面 -->
+          <div id="result-view" class="hidden flex flex-col items-center">
+            <div class="w-16 h-16 rounded-full bg-rose-500/10 border border-rose-500/30 flex items-center justify-center mb-4 text-rose-500 text-2xl">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h2 class="text-3xl font-black text-rose-500 mb-2">GAME OVER</h2>
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl mb-6 min-w-[280px]">
+              <p class="text-xs text-slate-400 uppercase tracking-widest mb-1">進捗度 (Progress)</p>
+              <p id="progress-percent" class="text-5xl font-black text-indigo-400">0.0%</p>
+              <div class="w-full bg-slate-950 rounded-full h-2 mt-4 overflow-hidden border border-slate-800">
+                <div id="progress-bar" class="bg-gradient-to-r from-indigo-500 to-rose-500 h-2 rounded-full" style="width: 0%"></div>
+              </div>
+              <p id="progress-detail" class="text-xs text-slate-500 mt-2">Tile 0 / 0</p>
+            </div>
+            <button id="btn-retry" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-bold transition shadow-lg shadow-indigo-500/20">
+              もう一度挑戦する <kbd class="ml-2 px-1.5 py-0.5 bg-indigo-800 rounded text-xs">Space / Enter</kbd>
+            </button>
+          </div>
+
+          <!-- 広告・トラブル割り込み検知 -->
+          <div id="ads-view" class="hidden flex flex-col items-center">
+            <div class="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-4 text-amber-500 text-2xl animate-bounce">
+              <i class="fa-solid fa-circle-pause"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-amber-500 mb-2">一時停止中 / 広告検知</h2>
+            <p class="text-sm text-slate-400 mb-6 max-w-md">YouTubeプレイヤーの遅延、または広告の再生を検出しました。準備ができたら以下のボタンで再開してください。</p>
+            <button id="btn-resume-sync" class="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 rounded-xl text-sm font-bold transition shadow-lg">
+              シンクして再開（3秒カウント） <kbd class="ml-2 px-1.5 py-0.5 bg-amber-700 text-white rounded text-xs">Space / Enter</kbd>
+            </button>
+          </div>
+        </div>
+
+        <!-- リアルタイム判定表示 -->
+        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none z-10 text-center">
+          <div id="judge-tag" class="text-3xl font-black tracking-widest uppercase transition-all duration-100 scale-95 opacity-0">
+            PERFECT
+          </div>
+          <div id="combo-tag" class="text-sm font-bold text-slate-400 mt-1 opacity-0">
+            Combo 0
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 右半分：譜面作成パネル＆コントロール (4/12) -->
+    <div id="panel-area" class="lg:col-span-4 flex flex-col gap-6">
+      
+      <!-- プレイモード情報/ヘルプパネル -->
+      <div id="panel-play" class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-5 shadow-xl">
+        <h3 class="text-lg font-bold border-b border-slate-800 pb-3 flex items-center gap-2">
+          <i class="fa-solid fa-circle-info text-indigo-400"></i>
+          <span>プレイヘルプ</span>
+        </h3>
+        <div class="space-y-4 text-sm text-slate-300">
+          <p>
+            タイミングを合わせて <kbd class="px-2 py-1 bg-slate-950 border border-slate-800 rounded font-mono font-bold text-indigo-400">Enter</kbd> または <kbd class="px-2 py-1 bg-slate-950 border border-slate-800 rounded font-mono font-bold text-indigo-400">Space</kbd> を押そう！
+          </p>
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
+            <div class="flex justify-between">
+              <span class="text-emerald-400 font-bold">Perfect</span>
+              <span>±0.2秒以内</span>
+            </div>
+            <div class="flex justify-between border-t border-slate-900 pt-1.5">
+              <span class="text-amber-500 font-bold">Orange</span>
+              <span>±0.2～0.5秒 (5連発でアウト)</span>
+            </div>
+            <div class="flex justify-between border-t border-slate-900 pt-1.5">
+              <span class="text-rose-500 font-bold">Red</span>
+              <span>±0.5秒以上 (一発アウト)</span>
+            </div>
+          </div>
+          <div class="border-t border-slate-800 pt-3 space-y-2 text-xs text-slate-400">
+            <p><b class="text-slate-300">Rキー:</b> 瞬時にリトライ</p>
+            <p><b class="text-slate-300">Pキー:</b> ポーズ / マニュアルシンク</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 譜面作成（エディター）パネル -->
+      <div id="panel-edit" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col gap-5 shadow-xl max-h-[700px] overflow-y-auto">
+        <h3 class="text-lg font-bold border-b border-slate-800 pb-3 flex items-center justify-between">
+          <span class="flex items-center gap-2">
+            <i class="fa-solid fa-hammer text-emerald-400"></i>
+            <span>譜面エディター</span>
+          </span>
+          <span id="editor-tile-count" class="text-xs bg-slate-950 px-2 py-1 rounded border border-slate-800 text-slate-400">
+            0 タイル
+          </span>
+        </h3>
+
+        <!-- 新規・読み込み選択 -->
+        <div id="edit-mode-select" class="space-y-3">
+          <p class="text-xs text-slate-400">作成を開始する方法を選択してください：</p>
+          <div class="grid grid-cols-2 gap-3">
+            <button id="btn-editor-new" class="py-3 px-4 bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 rounded-xl font-bold transition text-xs flex flex-col items-center gap-1.5">
+              <i class="fa-solid fa-plus-circle text-lg"></i>
+              新規譜面作成
+            </button>
+            <button id="btn-editor-load-exist" class="py-3 px-4 bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 rounded-xl font-bold transition text-xs flex flex-col items-center gap-1.5">
+              <i class="fa-solid fa-file-arrow-up text-lg"></i>
+              保存データから
+            </button>
+          </div>
+        </div>
+
+        <!-- 編集用の主要ツール -->
+        <div id="editor-tools" class="hidden space-y-4">
+          <!-- タイル個別編集 -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+            <h4 class="text-xs font-bold uppercase tracking-widest text-slate-400">選択タイルの設定</h4>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <span class="text-slate-400 block mb-1">タイルID</span>
+                <input type="text" id="edit-tile-id" disabled class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1.5 text-center text-slate-400" value="-">
+              </div>
+              <div>
+                <span class="text-slate-400 block mb-1">BPM (テンポ)</span>
+                <input type="number" id="edit-tile-bpm" min="1" max="999" class="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-center font-bold text-emerald-400 focus:outline-none focus:border-emerald-500">
+              </div>
+            </div>
+
+            <!-- 角度設定 (30°刻み) -->
+            <div>
+              <span class="text-slate-400 text-xs block mb-1">角度設定 (進行方向)</span>
+              <div class="grid grid-cols-4 gap-1.5">
+                <!-- JSで角度ボタンを動的生成します -->
+                <div id="angle-buttons-container" class="col-span-4 grid grid-cols-4 gap-1"></div>
+              </div>
+              <p class="text-[10px] text-slate-500 mt-1.5">※0°=右, 90°=下, 180°=左, 270°=上 (時計回り)。id:1は初期位置のため角度固定です。</p>
+            </div>
+          </div>
+
+          <!-- タイル追加/削除アクション -->
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-add-tile" class="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-plus"></i>
+              末尾にタイル追加
+            </button>
+            <button id="btn-delete-tile" class="py-2.5 px-3 bg-rose-600/10 hover:bg-rose-600 text-rose-500 hover:text-white border border-rose-500/20 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-trash"></i>
+              選択中を削除
+            </button>
+          </div>
+
+          <!-- 譜面リストプレビュー -->
+          <div>
+            <span class="text-slate-400 text-xs font-bold block mb-2">タイルシーケンス</span>
+            <div id="tile-list-container" class="bg-slate-950 border border-slate-800 rounded-xl h-44 overflow-y-auto p-1.5 space-y-1">
+              <!-- 動的配置されるタイルリスト -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- メタデータ設定編集モーダル (新規/途中編集) -->
+  <div id="modal-meta" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-6 z-50">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-up">
+      <div class="p-6 border-b border-slate-800">
+        <h3 class="text-lg font-bold flex items-center gap-2 text-indigo-400">
+          <i class="fa-solid fa-pen-to-square"></i>
+          <span>譜面メタ情報の設定</span>
+        </h3>
+      </div>
+      <div class="p-6 space-y-4 text-sm">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">譜面名（曲名）</label>
+          <input type="text" id="meta-title" placeholder="例: My Favorite Song" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">YouTube 動画ID (11桁の英数字)</label>
+          <input type="text" id="meta-video-id" placeholder="例: dQw4w9WgXcQ" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+          <p class="text-[10px] text-slate-500 mt-1">動画URLの「v=xxxxxxx」の部分を入力します。</p>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">譜面制作者のニックネーム</label>
+          <input type="text" id="meta-author" placeholder="例: RhythmMaster" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1">メモ (BPM目安やクレジットなど)</label>
+          <textarea id="meta-memo" rows="3" placeholder="めもめも..." class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 resize-none"></textarea>
+        </div>
+      </div>
+      <div class="p-6 bg-slate-950 border-t border-slate-800 flex justify-end gap-3">
+        <button id="btn-meta-cancel" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold transition">
+          キャンセル
+        </button>
+        <button id="btn-meta-save" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition">
+          保存して適用
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- YouTube IFrame API Loader -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <!-- ゲームロジック実装 -->
+  <script>
+    // --- グローバルステート / 定数 ---
+    const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'adofai-clone-app';
+    
+    // ゲーム設定
+    let mode = 'play'; // 'play' or 'edit'
+    let isYtForeground = false; // YouTubeを前面にするか
+    let isGameRunning = false;
+    let isCountingDown = false;
+    
+    // YouTubeプレイヤー制御
+    let ytPlayer = null;
+    let ytReady = false;
+    let ytState = -1; // YouTube PlayerState
+    let adDetectTimer = null;
+
+    // 現在展開中の譜面（JSON）
+    let currentMap = {
+      title: "デモ・オービット",
+      videoID: "Qd01-62VbE8", // 初期のダミー/デモ用楽曲 (NCS等の良曲など)
+      author: "System",
+      memo: "スペースキーでテスト可能なデフォルトのデモ譜面です。",
+      tiles: [
+        { id: 1, angle: null, bpm: 120 },
+        { id: 2, angle: 0, bpm: 120 },
+        { id: 3, angle: 90, bpm: 120 },
+        { id: 4, angle: 180, bpm: 120 },
+        { id: 5, angle: 270, bpm: 120 },
+        { id: 6, angle: 0, bpm: 150 }, // ここから加速
+        { id: 7, angle: 0, bpm: 150 },
+        { id: 8, angle: 90, bpm: 150 },
+        { id: 9, angle: 180, bpm: 150 },
+        { id: 10, angle: 270, bpm: 150 },
+        { id: 11, angle: 0, bpm: 90 }, // ここから減速
+        { id: 12, angle: 180, bpm: 90 },
+        { id: 13, angle: 0, bpm: 90 },
+        { id: 14, angle: 180, bpm: 90 },
+        { id: 15, angle: 90, bpm: 120 },
+        { id: 16, angle: 0, bpm: 120 },
+        { id: 17, angle: 270, bpm: 120 },
+        { id: 18, angle: 180, bpm: 120 },
+        { id: 19, angle: 90, bpm: 120 },
+        { id: 20, angle: 0, bpm: 120 }
+      ]
+    };
+
+    // プレイ状態
+    let currentTileIndex = 0; // 現在進行中のタイル (0から開始 = id 1)
+    let combo = 0;
+    let orangeConsecutiveCount = 0; // 連続Orange判定のカウンタ
+    
+    // ボール状態
+    let ballPivotIndex = 0; // 現在軸となっているタイルのインデックス
+    let travelerAngle = 0; // 現在のトラベラーの角度(ラジアン)
+    let rotationDir = 1; // 1: 時計回り, -1: 反時計回り
+    let lastBeatTime = 0; // 直前の拍時刻 (秒)
+    let ballBaseSpeed = 1; // 1拍で180度(PIラジアン)回転する
+    
+    // エディター状態
+    let selectedTileIndex = 0; // エディタで選択中のタイルインデックス
+
+    // Canvas & 描画
+    const canvas = document.getElementById('game-canvas');
+    const ctx = canvas.getContext('2d');
+    let cameraX = 0;
+    let cameraY = 0;
+    const TILE_DISTANCE = 80; // タイル間の基本ピクセル距離
+
+    // --- YouTube API 初期化 ---
+    function onYouTubeIframeAPIReady() {
+      initPlayer(currentMap.videoID);
+    }
+
+    function initPlayer(videoId) {
+      if (ytPlayer) {
+        ytPlayer.destroy();
+      }
+      
+      // IFrameの設置
+      const container = document.getElementById('yt-player-container');
+      container.innerHTML = '<div id="yt-iframe-placeholder"></div>';
+
+      ytPlayer = new YT.Player('yt-iframe-placeholder', {
+        height: '100%',
+        width: '100%',
+        videoId: videoId,
+        playerVars: {
+          playsinline: 1,
+          controls: 0,
+          disablekb: 1,
+          fs: 0,
+          rel: 0,
+          modestbranding: 1
+        },
+        events: {
+          'onReady': onPlayerReady,
+          'onStateChange': onPlayerStateChange
+        }
+      });
+    }
+
+    function onPlayerReady(event) {
+      ytReady = true;
+      document.getElementById('btn-game-trigger').classList.remove('hidden');
+      updateUI();
+    }
+
+    function onPlayerStateChange(event) {
+      ytState = event.data;
+      
+      // 広告、または動画一時停止によるズレ検知
+      if (isGameRunning) {
+        if (ytState === YT.PlayerState.PAUSED || ytState === YT.PlayerState.BUFFERING) {
+          triggerAdPause();
+        }
+      }
+    }
+
+    // --- ゲームの初期セットアップ ---
+    window.addEventListener('load', () => {
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+      
+      // イベントリスナーのバインド
+      setupEventListeners();
+      
+      // 初期の描画ループ
+      requestAnimationFrame(gameLoop);
+      
+      // 初期画面の更新
+      updateUI();
+    });
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+    }
+
+    // --- 描画ロジック ---
+    // タイルの絶対的なスクリーン・座標を取得する関数
+    function getTilePosition(index) {
+      let x = canvas.width / 2;
+      let y = canvas.height / 2;
+
+      for (let i = 1; i <= index; i++) {
+        const tile = currentMap.tiles[i];
+        if (tile && tile.angle !== null) {
+          const rad = (tile.angle * Math.PI) / 180;
+          x += Math.cos(rad) * TILE_DISTANCE;
+          y += Math.sin(rad) * TILE_DISTANCE;
+        }
+      }
+      return { x, y };
+    }
+
+    function gameLoop(timestamp) {
+      // 描画のクリア
+      ctx.fillStyle = '#020617'; // slate-950
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (currentMap && currentMap.tiles.length > 0) {
+        // カメラの追従 (現在のピボットにスムースに追従)
+        const pivotPos = getTilePosition(ballPivotIndex);
+        cameraX += (pivotPos.x - cameraX) * 0.1;
+        cameraY += (pivotPos.y - cameraY) * 0.1;
+
+        const offsetX = canvas.width / 2 - cameraX;
+        const offsetY = canvas.height / 2 - cameraY;
+
+        // 1. タイル（譜面）の描画
+        for (let i = 0; i < currentMap.tiles.length; i++) {
+          const tile = currentMap.tiles[i];
+          const pos = getTilePosition(i);
+          const drawX = pos.x + offsetX;
+          const drawY = pos.y + offsetY;
+
+          // BPM変更に基づいたカラーリング判定
+          let tileColor = '#4f46e5'; // 通常: indigo-600
+          let glowColor = 'rgba(79, 70, 229, 0.4)';
+          
+          if (i > 0) {
+            const prevBpm = currentMap.tiles[i-1].bpm;
+            if (tile.bpm > prevBpm) {
+              tileColor = '#e11d48'; // 加速: rose-600
+              glowColor = 'rgba(225, 29, 72, 0.5)';
+            } else if (tile.bpm < prevBpm) {
+              tileColor = '#0284c7'; // 減速: sky-600
+              glowColor = 'rgba(2, 132, 199, 0.5)';
+            }
+          }
+
+          // 選択中のタイルの強調表示 (エディタモードのみ)
+          const isSelected = (mode === 'edit' && selectedTileIndex === i);
+          
+          // タイルの円形（あるいは角丸矩形）を描画
+          ctx.beginPath();
+          ctx.arc(drawX, drawY, isSelected ? 22 : 18, 0, Math.PI * 2);
+          
+          if (isSelected) {
+            ctx.fillStyle = '#10b981'; // emerald-500
+            ctx.fill();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#ffffff';
+            ctx.stroke();
+          } else {
+            ctx.fillStyle = '#0f172a'; // slate-900
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = tileColor;
+            ctx.stroke();
+          }
+
+          // 光彩エフェクト
+          ctx.shadowBlur = isSelected ? 15 : 8;
+          ctx.shadowColor = isSelected ? '#10b981' : tileColor;
+
+          // インデックスやBPM情報のテキスト
+          ctx.shadowBlur = 0; // テキスト描画時はシャドウ無効
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = 'bold 10px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(tile.id, drawX, drawY);
+
+          // BPM変更箇所のラベル描画
+          if (i === 0 || (i > 0 && tile.bpm !== currentMap.tiles[i-1].bpm)) {
+            ctx.fillStyle = tileColor;
+            ctx.font = 'bold 9px sans-serif';
+            ctx.fillText(`${tile.bpm} BPM`, drawX, drawY - 28);
+          }
+
+          // タイル同士を結ぶガイドラインの描画
+          if (i < currentMap.tiles.length - 1) {
+            const nextPos = getTilePosition(i + 1);
+            ctx.beginPath();
+            ctx.moveTo(drawX, drawY);
+            ctx.lineTo(nextPos.x + offsetX, nextPos.y + offsetY);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+            ctx.stroke();
+          }
+        }
+
+        // 2. 回転する2つのボールの物理＆描画
+        if (isGameRunning && ytPlayer && typeof ytPlayer.getCurrentTime === 'function') {
+          // YouTubeの現在秒数を基準に進行させる
+          const ytTime = ytPlayer.getCurrentTime();
+          
+          // トラベラーのリアルタイム角度更新
+          updateBallPhysics(ytTime);
+
+          const pivotTilePos = getTilePosition(ballPivotIndex);
+          const px = pivotTilePos.x + offsetX;
+          const py = pivotTilePos.y + offsetY;
+
+          // トラベラーの現在地算出
+          const tx = px + Math.cos(travelerAngle) * TILE_DISTANCE;
+          const ty = py + Math.sin(travelerAngle) * TILE_DISTANCE;
+
+          // ガイド接続線の描画（ピボットとトラベラーを繋ぐ）
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(tx, ty);
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+          ctx.stroke();
+
+          // ピボット(静止軸)ボール
+          ctx.beginPath();
+          ctx.arc(px, py, 12, 0, Math.PI * 2);
+          ctx.fillStyle = '#ef4444'; // 赤玉
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = '#ef4444';
+          ctx.fill();
+
+          // トラベラー(回転側)ボール
+          ctx.beginPath();
+          ctx.arc(tx, ty, 12, 0, Math.PI * 2);
+          ctx.fillStyle = '#3b82f6'; // 青玉
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = '#3b82f6';
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        } else {
+          // 非プレイ中：最初のタイル上にダミー表示
+          const pos = getTilePosition(ballPivotIndex);
+          const px = pos.x + offsetX;
+          const py = pos.y + offsetY;
+          
+          ctx.beginPath();
+          ctx.arc(px, py, 12, 0, Math.PI * 2);
+          ctx.fillStyle = '#ef4444';
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(px + TILE_DISTANCE, py, 12, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(59, 130, 246, 0.5)';
+          ctx.fill();
+        }
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // --- ボール回転物理の計算 ---
+    function updateBallPhysics(currentTime) {
+      const currentTile = currentMap.tiles[currentTileIndex];
+      const nextTile = currentMap.tiles[currentTileIndex + 1];
+      
+      if (!nextTile) return;
+
+      const bpm = currentTile.bpm;
+      const beatDuration = 60 / bpm; // 1拍の秒数
+
+      // ADOFAI式判定理論：
+      // トラベラーは、前回のヒット時間から、今回のターゲット（次のタイル）に向かって回転する。
+      // 1拍（beatDuration）あたり、180度（Math.PIラジアン）移動する。
+      const elapsed = currentTime - lastBeatTime;
+      const angleDelta = (elapsed / beatDuration) * Math.PI;
+
+      // 前回のヒット確定時の初期進入角度をベースにする
+      const startAngle = getIncomingAngle(); 
+      
+      // 回転方向に応じて加減算
+      travelerAngle = startAngle + (angleDelta * rotationDir);
+    }
+
+    // 前回の確定角度(ピボットと進行方向から算出)
+    function getIncomingAngle() {
+      if (currentTileIndex === 0) {
+        // スタート時は0度（右方向）の対面(180度)からスタートする
+        return Math.PI;
+      }
+      const prevTile = currentMap.tiles[currentTileIndex - 1];
+      const curTile = currentMap.tiles[currentTileIndex];
+      if (!prevTile || curTile.angle === null) return Math.PI;
+
+      // 前回の配置角度の反対から回り始める
+      return ((curTile.angle + 180) * Math.PI) / 180;
+    }
+
+    // --- リズムタイミング判定ロジック ---
+    function judgeInput() {
+      if (!isGameRunning) return;
+
+      const nextTileIndex = currentTileIndex + 1;
+      if (nextTileIndex >= currentMap.tiles.length) return; // 終点
+
+      const currentTile = currentMap.tiles[currentTileIndex];
+      const nextTile = currentMap.tiles[nextTileIndex];
+
+      // 目標とするジャスト角度(ラジアン)
+      const targetAngleRad = (nextTile.angle * Math.PI) / 180;
+      
+      // トラベラーの現在の角度を、目標角度との差が最小になるよう正規化
+      let diff = travelerAngle - targetAngleRad;
+      // 角度を [-PI, PI] の範囲に収める
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+
+      // 現在のBPMから、角度ズレを「秒数ズレ」に逆算
+      const bpm = currentTile.bpm;
+      const beatDuration = 60 / bpm;
+      // 角度のズレ比率から、時間のズレ(秒)を算出
+      const timeDiff = (diff / Math.PI) * beatDuration;
+
+      // 判定処理
+      const absDiff = Math.abs(timeDiff);
+      let judge = "Perfect";
+      let isOver = false;
+
+      if (absDiff <= 0.20) {
+        judge = "Perfect";
+        orangeConsecutiveCount = 0;
+      } else if (absDiff <= 0.50) {
+        judge = timeDiff < 0 ? "Early (Orange)" : "Late (Orange)";
+        orangeConsecutiveCount++;
+        if (orangeConsecutiveCount >= 5) {
+          isOver = true;
+        }
+      } else {
+        judge = timeDiff < 0 ? "Early (Red)" : "Late (Red)";
+        isOver = true;
+      }
+
+      // 判定タグの表示更新
+      showJudgeUI(judge, isOver);
+
+      if (isOver) {
+        triggerGameOver();
+      } else {
+        // 成功時の進行処理
+        currentTileIndex = nextTileIndex;
+        ballPivotIndex = nextTileIndex; // 軸の移動
         
-        // どちらが回転しているか (0: 赤が回転/青が固定, 1: 青が回転/赤が固定)
-        let activeBall = 0; 
-        let currentAngle = 0; // 現在の回転角(ラジアン)
-
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-
-        function onYouTubeIframeAPIReady() {
-            player = new YT.Player('player', {
-                height: '160',
-                width: '320',
-                videoId: document.getElementById('youtube-id').value,
-                events: { 'onReady': () => console.log("Player Ready") }
-            });
+        // 回転方向の交互切替 (本家風)
+        rotationDir *= -1; 
+        
+        // 現在のヒット時間を記録（YouTubeの時間をシンク）
+        if (ytPlayer) {
+          lastBeatTime = ytPlayer.getCurrentTime();
         }
+        
+        combo++;
+        
+        // 終了判定
+        if (currentTileIndex === currentMap.tiles.length - 1) {
+          showJudgeUI("STAGE CLEAR!!", false);
+          setTimeout(() => {
+            stopGame();
+            alert("おめでとうございます！譜面をクリアしました！");
+          }, 1000);
+        }
+      }
+    }
 
-        document.getElementById('load-video-btn').addEventListener('click', () => {
-            const videoId = document.getElementById('youtube-id').value;
-            bpm = parseFloat(document.getElementById('base-bpm').value) || 120;
-            if (player && player.loadVideoById) {
-                player.loadVideoById(videoId);
-                resetGame();
-            }
+    // 判定結果UIの描画・更新
+    function showJudgeUI(judge, isOver) {
+      const tag = document.getElementById('judge-tag');
+      const comboTag = document.getElementById('combo-tag');
+      tag.innerText = judge;
+      tag.className = "text-3xl font-black tracking-widest uppercase transition-all duration-100 scale-100 opacity-100";
+
+      // 判定ごとのカラー
+      if (judge === "Perfect") {
+        tag.style.color = '#10b981'; // emerald-500
+      } else if (judge.includes("Orange")) {
+        tag.style.color = '#f59e0b'; // amber-500
+      } else {
+        tag.style.color = '#ef4444'; // rose-500
+      }
+
+      if (isOver) {
+        comboTag.className = "text-sm font-bold text-rose-500 mt-1 opacity-100";
+        comboTag.innerText = "CRASH!";
+      } else {
+        comboTag.className = "text-sm font-bold text-slate-300 mt-1 opacity-100";
+        comboTag.innerText = `COMBO ${combo}` + (orangeConsecutiveCount > 0 ? ` (Orange: ${orangeConsecutiveCount}/5)` : '');
+      }
+
+      // 簡易アニメーションアウト
+      setTimeout(() => {
+        if (isGameRunning) {
+          tag.className = "text-3xl font-black tracking-widest uppercase transition-all duration-300 scale-95 opacity-0";
+        }
+      }, 600);
+    }
+
+    // --- ゲームの開始・停止・ポーズ ---
+    function triggerStartCountdown() {
+      if (isCountingDown || isGameRunning) return;
+      
+      isCountingDown = true;
+      document.getElementById('start-view').classList.add('hidden');
+      document.getElementById('result-view').classList.add('hidden');
+      document.getElementById('ads-view').classList.add('hidden');
+      document.getElementById('countdown-view').classList.remove('hidden');
+      
+      let count = 3;
+      const countNum = document.getElementById('countdown-num');
+      countNum.innerText = count;
+
+      // プレイヤーを最初期位置にセット
+      currentTileIndex = 0;
+      ballPivotIndex = 0;
+      combo = 0;
+      orangeConsecutiveCount = 0;
+      rotationDir = 1;
+
+      // YouTubeを再生してミュート解除などの初期同期準備
+      if (ytPlayer && ytReady) {
+        ytPlayer.seekTo(0);
+        ytPlayer.pauseVideo();
+      }
+
+      const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countNum.innerText = count;
+        } else {
+          clearInterval(interval);
+          startGamePlay();
+        }
+      }, 1000);
+    }
+
+    function startGamePlay() {
+      isCountingDown = false;
+      document.getElementById('countdown-view').classList.add('hidden');
+      document.getElementById('game-overlay').classList.add('opacity-0', 'pointer-events-none');
+
+      if (ytPlayer && ytReady) {
+        ytPlayer.playVideo();
+        lastBeatTime = 0; // YouTubeのスタート時間
+      }
+      isGameRunning = true;
+    }
+
+    function stopGame() {
+      isGameRunning = false;
+      isCountingDown = false;
+      if (ytPlayer && ytReady) {
+        ytPlayer.pauseVideo();
+      }
+      document.getElementById('game-overlay').classList.remove('opacity-0', 'pointer-events-none');
+    }
+
+    function triggerGameOver() {
+      stopGame();
+      
+      // 進行率算出式
+      const totalTiles = currentMap.tiles.length;
+      const clearedTiles = currentTileIndex; // 0番目始まりなので、現在インデックス＝クリアした数
+      const progress = totalTiles > 0 ? ((clearedTiles / totalTiles) * 100).toFixed(1) : 0;
+
+      document.getElementById('start-view').classList.add('hidden');
+      document.getElementById('ads-view').classList.add('hidden');
+      document.getElementById('result-view').classList.remove('hidden');
+
+      document.getElementById('progress-percent').innerText = `${progress}%`;
+      document.getElementById('progress-bar').style.width = `${progress}%`;
+      document.getElementById('progress-detail').innerText = `Tile ${clearedTiles} / ${totalTiles}`;
+    }
+
+    // 広告や通信ラグによるポーズ
+    function triggerAdPause() {
+      isGameRunning = false;
+      if (ytPlayer && ytReady) {
+        ytPlayer.pauseVideo();
+      }
+      document.getElementById('game-overlay').classList.remove('opacity-0', 'pointer-events-none');
+      document.getElementById('start-view').classList.add('hidden');
+      document.getElementById('result-view').classList.add('hidden');
+      document.getElementById('ads-view').classList.remove('hidden');
+    }
+
+    function resumeSync() {
+      document.getElementById('ads-view').classList.add('hidden');
+      document.getElementById('countdown-view').classList.remove('hidden');
+      
+      let count = 3;
+      const countNum = document.getElementById('countdown-num');
+      countNum.innerText = count;
+
+      // YouTubeプレイヤーの現在時間を取得して位置を合わせる
+      let resumeTime = 0;
+      if (ytPlayer) {
+        // 現在秒数を少し戻して再スタートする
+        resumeTime = Math.max(0, ytPlayer.getCurrentTime() - 1);
+        ytPlayer.seekTo(resumeTime);
+        ytPlayer.pauseVideo();
+      }
+
+      const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+          countNum.innerText = count;
+        } else {
+          clearInterval(interval);
+          document.getElementById('countdown-view').classList.add('hidden');
+          document.getElementById('game-overlay').classList.add('opacity-0', 'pointer-events-none');
+          
+          if (ytPlayer) {
+            ytPlayer.playVideo();
+            lastBeatTime = resumeTime; // 再開時タイムラグ補正
+          }
+          isGameRunning = true;
+        }
+      }, 1000);
+    }
+
+    // --- UI/UX更新 ---
+    function updateUI() {
+      // 共通タイトル・BPMの表示
+      document.getElementById('display-title').innerText = currentMap.title || "無題の譜面";
+      document.getElementById('display-bpm').innerText = currentMap.tiles[0] ? `${currentMap.tiles[0].bpm}` : "--";
+      
+      if (mode === 'play') {
+        document.getElementById('panel-play').classList.remove('hidden');
+        document.getElementById('panel-edit').classList.add('hidden');
+        document.getElementById('editor-actions').classList.add('hidden');
+      } else {
+        document.getElementById('panel-play').classList.add('hidden');
+        document.getElementById('panel-edit').classList.remove('hidden');
+        document.getElementById('editor-actions').classList.remove('hidden');
+        
+        // エディタ専用パネル内情報の同期
+        document.getElementById('editor-tile-count').innerText = `${currentMap.tiles.length} タイル`;
+        renderEditorTileList();
+      }
+
+      // YouTube プレイヤー表示先（背面・前面）のコントロール
+      const ytContainer = document.getElementById('yt-player-container');
+      const btnToggleYt = document.getElementById('btn-toggle-yt');
+      if (isYtForeground) {
+        ytContainer.className = "yt-fg rounded-2xl overflow-hidden shadow-2xl border border-slate-800 bg-black transition-all duration-300";
+        btnToggleYt.innerHTML = '<i class="fa-brands fa-youtube text-rose-500"></i> <span>YouTube: 表面</span>';
+      } else {
+        ytContainer.className = "yt-bg rounded-2xl overflow-hidden shadow-2xl border border-slate-800 bg-black transition-all duration-300";
+        btnToggleYt.innerHTML = '<i class="fa-brands fa-youtube text-rose-500"></i> <span>YouTube: 背面</span>';
+      }
+    }
+
+    // --- エディター専用ロジック ---
+    function openMetaModal() {
+      document.getElementById('meta-title').value = currentMap.title || "";
+      document.getElementById('meta-video-id').value = currentMap.videoID || "";
+      document.getElementById('meta-author').value = currentMap.author || "";
+      document.getElementById('meta-memo').value = currentMap.memo || "";
+      document.getElementById('modal-meta').classList.remove('hidden');
+    }
+
+    function saveMetaModal() {
+      currentMap.title = document.getElementById('meta-title').value || "無題の譜面";
+      currentMap.videoID = document.getElementById('meta-video-id').value || "Qd01-62VbE8";
+      currentMap.author = document.getElementById('meta-author').value || "Anonymous";
+      currentMap.memo = document.getElementById('meta-memo').value || "";
+
+      document.getElementById('modal-meta').classList.add('hidden');
+      
+      // YouTubeプレイヤーの再ロード
+      initPlayer(currentMap.videoID);
+      updateUI();
+    }
+
+    function loadNewEditor() {
+      // 全く新しい譜面
+      currentMap = {
+        title: "新規作成譜面",
+        videoID: "Qd01-62VbE8",
+        author: "クリエイター",
+        memo: "新しい譜面です。",
+        tiles: [
+          { id: 1, angle: null, bpm: 120 } // 最初は1枚だけ
+        ]
+      };
+      selectedTileIndex = 0;
+      document.getElementById('edit-mode-select').classList.add('hidden');
+      document.getElementById('editor-tools').classList.remove('hidden');
+      openMetaModal();
+    }
+
+    function loadExistingToEditor() {
+      document.getElementById('edit-mode-select').classList.add('hidden');
+      document.getElementById('editor-tools').classList.remove('hidden');
+      selectedTileIndex = 0;
+      updateUI();
+    }
+
+    // 角度入力用30度刻みボタン生成
+    function renderAngleButtons() {
+      const container = document.getElementById('angle-buttons-container');
+      container.innerHTML = "";
+      
+      // 30度刻み (0から330度まで)
+      for (let angle = 0; angle < 360; angle += 30) {
+        const btn = document.createElement('button');
+        btn.className = "py-1.5 bg-slate-900 hover:bg-slate-800 rounded font-mono font-bold text-slate-300 border border-slate-800 transition active:scale-95";
+        btn.innerText = `${angle}°`;
+        btn.addEventListener('click', () => {
+          setTileAngle(angle);
+        });
+        container.appendChild(btn);
+      }
+    }
+
+    function selectTile(index) {
+      selectedTileIndex = index;
+      const tile = currentMap.tiles[index];
+      
+      document.getElementById('edit-tile-id').value = tile.id;
+      document.getElementById('edit-tile-bpm').value = tile.bpm;
+
+      // 選択アイテムの見た目更新
+      const items = document.querySelectorAll('.tile-list-item');
+      items.forEach((item, idx) => {
+        if (idx === index) {
+          item.classList.add('border-emerald-500', 'bg-emerald-950/20');
+        } else {
+          item.classList.remove('border-emerald-500', 'bg-emerald-950/20');
+        }
+      });
+    }
+
+    function setTileAngle(angle) {
+      if (selectedTileIndex === 0) {
+        alert("id: 1 のタイルはスタート初期位置のため角度を決定できません(NULL)。");
+        return;
+      }
+      currentMap.tiles[selectedTileIndex].angle = angle;
+      updateUI();
+    }
+
+    function addTile() {
+      const lastTile = currentMap.tiles[currentMap.tiles.length - 1];
+      const newId = lastTile ? lastTile.id + 1 : 1;
+      const defaultBpm = lastTile ? lastTile.bpm : 120;
+      // 追加時は前方のタイルの流れ(例えば0度：右)に合わせる
+      currentMap.tiles.push({
+        id: newId,
+        angle: 0,
+        bpm: defaultBpm
+      });
+      selectedTileIndex = currentMap.tiles.length - 1;
+      updateUI();
+    }
+
+    function deleteSelectedTile() {
+      if (currentMap.tiles.length <= 1) {
+        alert("これ以上タイルを削除できません。");
+        return;
+      }
+      if (selectedTileIndex === 0) {
+        alert("最初のタイルは削除できません。");
+        return;
+      }
+      currentMap.tiles.splice(selectedTileIndex, 1);
+      
+      // IDの再ナンバリング
+      currentMap.tiles.forEach((t, i) => {
+        t.id = i + 1;
+      });
+
+      selectedTileIndex = Math.max(0, selectedTileIndex - 1);
+      updateUI();
+    }
+
+    function renderEditorTileList() {
+      const container = document.getElementById('tile-list-container');
+      container.innerHTML = "";
+
+      currentMap.tiles.forEach((tile, index) => {
+        const item = document.createElement('div');
+        item.className = `tile-list-item flex items-center justify-between p-2 rounded-lg border text-xs cursor-pointer transition ${selectedTileIndex === index ? 'border-emerald-500 bg-emerald-950/20' : 'border-slate-800 hover:bg-slate-900'}`;
+        
+        const angleText = tile.angle !== null ? `${tile.angle}°` : "スタート";
+        item.innerHTML = `
+          <span class="font-mono text-slate-400">#${tile.id}</span>
+          <span class="font-bold text-slate-200">${angleText}</span>
+          <span class="bg-slate-900 px-2 py-0.5 rounded border border-slate-800 text-emerald-400 font-bold">${tile.bpm} BPM</span>
+        `;
+
+        item.addEventListener('click', () => {
+          selectTile(index);
         });
 
-        // --- エディタ機能 ---
-        function addNoteFromInput() {
-            if (!player || typeof player.getCurrentTime !== 'function') return;
-            const currentTime = player.getCurrentTime();
-            const angleDeg = parseFloat(document.getElementById('angle-input').value);
+        container.appendChild(item);
+      });
+    }
+
+    // --- JSON ファイルのインポート / エクスポート ---
+    function exportMap() {
+      const jsonStr = JSON.stringify(currentMap, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentMap.title || 'map'}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function importMap(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const imported = JSON.parse(evt.target.result);
+          if (imported.tiles && Array.isArray(imported.tiles)) {
+            currentMap = imported;
+            selectedTileIndex = 0;
             
-            chart.push({ time: currentTime, angle: angleDeg });
-            chart.sort((a, b) => a.time - b.time);
+            // YouTubeプレイヤーの再初期化
+            initPlayer(currentMap.videoID);
             
-            updateChartList();
-            generatePath();
-        }
-
-        function updateChartList() {
-            const listDiv = document.getElementById('chart-list');
-            listDiv.innerHTML = chart.map((n, i) => `[${i}] ${n.time.toFixed(2)}s: ${n.angle}°`).join('<br>');
-        }
-
-        function resetGame() {
-            currentNoteIndex = 0;
-            score = 0;
-            activeBall = 0; 
-            document.getElementById('score-text').innerText = `Hit: 0 / Total: ${chart.length}`;
-            generatePath();
-        }
-
-        // 30°間隔の角度情報から、タイル（マス）の座標を一本道として計算
-        function generatePath() {
-            pathPoints = [{ x: 200, y: 250 }]; // スタート位置
-            let curX = 200;
-            let curY = 250;
-
-            chart.forEach(note => {
-                // ADOFAIはベースが右(0度)で反時計回りに角度が進むため、ラジアンに変換
-                // CanvasのY軸は下方向が正なので、マイナスをかけて上下を反転
-                const rad = (note.angle * Math.PI) / 180;
-                curX += Math.cos(rad) * TILE_DISTANCE;
-                curY -= Math.sin(rad) * TILE_DISTANCE; 
-                pathPoints.push({ x: curX, y: curY });
-            });
-        }
-
-        // --- ゲームループ ---
-        function gameLoop() {
-            requestAnimationFrame(gameLoop);
-            if (!player || typeof player.getPlayerState !== 'function') return;
+            // UIの更新とモード同期
+            updateUI();
             
-            if (player.getPlayerState() === YT.PlayerState.PLAYING) {
-                const timeSec = player.getCurrentTime();
-                // 1拍（BPM）で180度(πラジアン)回転する計算
-                const radiansPerSecond = (bpm / 60) * Math.PI;
-                
-                // ターンごとに回転方向が交互に入れ替わる本家仕様を再現
-                // (activeBallの偶奇によって回転の向きを制御)
-                if (activeBall === 0) {
-                    currentAngle = timeSec * radiansPerSecond;
-                } else {
-                    currentAngle = -timeSec * radiansPerSecond;
-                }
-
-                // 固定されている側（ピボット）の位置を基準に、もう一方を回転させる
-                if (currentNoteIndex < pathPoints.length) {
-                    const pivot = pathPoints[currentNoteIndex];
-                    
-                    if (activeBall === 0) {
-                        // 青が固定、赤が回転
-                        ballBlue.x = pivot.x;
-                        ballBlue.y = pivot.y;
-                        ballRed.x = pivot.x + Math.cos(currentAngle) * TILE_DISTANCE;
-                        ballRed.y = pivot.y + Math.sin(currentAngle) * TILE_DISTANCE;
-                    } else {
-                        // 赤が固定、青が回転
-                        ballRed.x = pivot.x;
-                        ballRed.y = pivot.y;
-                        ballBlue.x = pivot.x + Math.cos(currentAngle) * TILE_DISTANCE;
-                        ballBlue.y = pivot.y + Math.sin(currentAngle) * TILE_DISTANCE;
-                    }
-                }
+            // スタート待機画面状態に戻す
+            document.getElementById('overlay-title').innerText = currentMap.title;
+            document.getElementById('overlay-desc').innerText = `作成者: ${currentMap.author}\n${currentMap.memo || ''}`;
+            
+            // エディタモード中であれば、ツールを強制活性化
+            if (mode === 'edit') {
+              loadExistingToEditor();
             }
 
-            // 描画
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            alert("譜面を正常に読み込みました。");
+          } else {
+            alert("無効な譜面ファイル形式です。");
+          }
+        } catch (err) {
+          alert("譜面ファイルの解析に失敗しました。");
+        }
+      };
+      reader.readAsText(file);
+    }
 
-            // 1. タイル（ライン）描画
-            if (pathPoints.length > 0) {
-                ctx.beginPath();
-                ctx.strokeStyle = '#333';
-                ctx.lineWidth = 8;
-                ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
-                for (let i = 1; i < pathPoints.length; i++) {
-                    ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
-                }
-                ctx.stroke();
+    // --- イベントリスナーのセットアップ ---
+    function setupEventListeners() {
+      // 共通キーボードインプット制御
+      window.addEventListener('keydown', (e) => {
+        // スペースキーまたはEnterキーを検知してアクション
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault(); // YouTube、ブラウザのスクロール等のデフォルト干渉を完全カット
 
-                pathPoints.forEach((pt, idx) => {
-                    ctx.beginPath();
-                    ctx.fillStyle = idx === currentNoteIndex + 1 ? '#ff9f43' : (idx <= currentNoteIndex ? '#555' : '#fff');
-                    ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = '#aaa';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                });
-            }
-
-            // 2. 2つのボールを描画
-            ctx.beginPath();
-            ctx.fillStyle = ballBlue.color;
-            ctx.arc(ballBlue.x, ballBlue.y, 12, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.fillStyle = ballRed.color;
-            ctx.arc(ballRed.x, ballRed.y, 12, 0, Math.PI * 2);
-            ctx.fill();
+          if (isGameRunning) {
+            judgeInput();
+          } else {
+            if (isCountingDown) return;
+            // 待機画面・ゲームオーバー画面からの再開
+            triggerStartCountdown();
+          }
         }
 
-        // --- 判定処理 ---
-        window.addEventListener('keydown', (e) => {
-            // エディタの入力欄にフォーカスがある時はゲームのキー入力を無効化
-            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT') return;
+        // Rキーによる高速リトライ
+        if (e.key === 'r' || e.key === 'R') {
+          stopGame();
+          triggerStartCountdown();
+        }
 
-            if (currentNoteIndex >= chart.length) return;
+        // Pキーによるマニュアルシンク（ポーズ・再開）
+        if (e.key === 'p' || e.key === 'P') {
+          if (isGameRunning) {
+            triggerAdPause();
+          } else if (document.getElementById('ads-view').classList.contains('hidden') === false) {
+            resumeSync();
+          }
+        }
+      });
 
-            const currentTime = player.getCurrentTime();
-            const targetTime = chart[currentNoteIndex].time;
-            const diff = Math.abs(currentTime - targetTime);
+      // マウスクリックでの入力判定（キーボードが不便なプレイヤー向け）
+      canvas.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (isGameRunning) {
+          judgeInput();
+        }
+      });
 
-            // 判定（0.15秒以内なら成功）
-            if (diff < 0.15) {
-                score++;
-                currentNoteIndex++;
-                // 成功したら回転するボールを入れ替える（交代）
-                activeBall = activeBall === 0 ? 1 : 0;
-                document.getElementById('score-text').innerText = `Hit: ${score} / Total: ${chart.length}`;
-            } else {
-                console.log("Miss! ズレ秒:", diff.toFixed(3));
-            }
-        });
+      // ボタンアクション
+      document.getElementById('btn-mode-play').addEventListener('click', () => {
+        mode = 'play';
+        document.getElementById('btn-mode-play').className = "px-4 py-1.5 rounded-md text-sm font-bold transition bg-indigo-600 text-white shadow-lg";
+        document.getElementById('btn-mode-edit').className = "px-4 py-1.5 rounded-md text-sm font-bold transition text-slate-400 hover:text-white";
+        stopGame();
+        updateUI();
+      });
 
-        // --- JSON 保存＆読込 ---
-        document.getElementById('download-json-btn').addEventListener('click', () => {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
-                youtubeId: document.getElementById('youtube-id').value,
-                bpm: bpm,
-                chart: chart
-            }, null, 2));
-            const downloadAnchor = document.createElement('a');
-            downloadAnchor.setAttribute("href", dataStr);
-            downloadAnchor.setAttribute("download", "adofai_30deg_chart.json");
-            document.body.appendChild(downloadAnchor);
-            downloadAnchor.click();
-            downloadAnchor.remove();
-        });
+      document.getElementById('btn-mode-edit').addEventListener('click', () => {
+        mode = 'edit';
+        document.getElementById('btn-mode-edit').className = "px-4 py-1.5 rounded-md text-sm font-bold transition bg-emerald-600 text-white shadow-lg";
+        document.getElementById('btn-mode-play').className = "px-4 py-1.5 rounded-md text-sm font-bold transition text-slate-400 hover:text-white";
+        stopGame();
+        updateUI();
+        renderAngleButtons();
+      });
 
-        document.getElementById('upload-json').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                try {
-                    const parsed = JSON.parse(evt.target.result);
-                    document.getElementById('youtube-id').value = parsed.youtubeId || "";
-                    document.getElementById('base-bpm').value = parsed.bpm || 120;
-                    bpm = parsed.bpm || 120;
-                    chart = parsed.chart || [];
-                    updateChartList();
-                    if (player && player.loadVideoById) player.loadVideoById(parsed.youtubeId);
-                    resetGame();
-                    alert("30°対応譜面を読み込みました！");
-                } catch (err) {
-                    alert("JSONファイルが不正です。");
-                }
-            };
-            reader.readAsText(file);
-        });
+      document.getElementById('btn-toggle-yt').addEventListener('click', () => {
+        isYtForeground = !isYtForeground;
+        updateUI();
+      });
 
-        requestAnimationFrame(gameLoop);
-    </script>
+      document.getElementById('file-import').addEventListener('change', importMap);
+
+      // ゲーム開始トリガー（オーバーレイ内）
+      document.getElementById('btn-game-trigger').addEventListener('click', triggerStartCountdown);
+      document.getElementById('btn-retry').addEventListener('click', triggerStartCountdown);
+      document.getElementById('btn-resume-sync').addEventListener('click', resumeSync);
+
+      // デモ譜面ロードボタン
+      document.getElementById('btn-load-demo').addEventListener('click', () => {
+        document.getElementById('overlay-title').innerText = currentMap.title;
+        document.getElementById('overlay-desc').innerText = `作成者: ${currentMap.author}\n${currentMap.memo}`;
+        updateUI();
+      });
+
+      // エディタボタン群
+      document.getElementById('btn-editor-new').addEventListener('click', loadNewEditor);
+      document.getElementById('btn-editor-load-exist').addEventListener('click', loadExistingToEditor);
+      document.getElementById('btn-edit-meta').addEventListener('click', openMetaModal);
+      document.getElementById('btn-export').addEventListener('click', exportMap);
+      document.getElementById('btn-add-tile').addEventListener('click', addTile);
+      document.getElementById('btn-delete-tile').addEventListener('click', deleteSelectedTile);
+
+      // エディタフォーム更新
+      document.getElementById('edit-tile-bpm').addEventListener('input', (e) => {
+        const bpm = parseInt(e.target.value) || 120;
+        currentMap.tiles[selectedTileIndex].bpm = bpm;
+        updateUI();
+      });
+
+      // メタモーダルボタン
+      document.getElementById('btn-meta-cancel').addEventListener('click', () => {
+        document.getElementById('modal-meta').classList.add('hidden');
+      });
+      document.getElementById('btn-meta-save').addEventListener('click', saveMetaModal);
+    }
+  </script>
 </body>
 </html>
