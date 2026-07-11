@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ADOFAI Style Rhythm Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #game-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        canvas {
+            background: #111;
+            border: 2px solid #444;
+            border-radius: 8px;
+        }
+        .controls {
+            background: #2b2b2b;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        label {
+            display: flex;
+            flex-direction: column;
+            font-size: 14px;
+            color: #ccc;
+        }
+        input, select, button {
+            margin-top: 5px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            background: #444;
+            color: #fff;
+        }
+        button {
+            cursor: pointer;
+            background: #007bff;
+            border: none;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .direction-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+        }
+        .direction-buttons button {
+            background: #555;
+        }
+        .direction-buttons button:hover {
+            background: #777;
+        }
+        #chart-list {
+            max-height: 150px;
+            overflow-y: auto;
+            background: #111;
+            padding: 5px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>ADOFAI Style Web Game</h1>
+    
+    <div id="player"></div>
+
+    <div id="game-container">
+        <div>
+            <canvas id="gameCanvas" width="600" height="400"></canvas>
+            <div style="margin-top: 10px; text-align: center;">
+                <p>Spaceキーでタイミングよくクリック！</p>
+                <h3 id="score-text">Hit: 0 / Total: 0</h3>
+            </div>
+        </div>
+
+        <div class="controls">
+            <h3>譜面設定</h3>
+            <label>
+                YouTube 動画ID:
+                <input type="text" id="youtube-id" value="dQw4w9WgXcQ" placeholder="動画URLの v= 以降の文字列">
+            </label>
+            <label>
+                基本BPM:
+                <input type="number" id="base-bpm" value="120">
+            </label>
+            <button id="load-video-btn">動画を読み込む/リセット</button>
+
+            <hr style="border: 0.5px solid #444; width: 100%;">
+
+            <h3>ノーツ追加 (エディタ)</h3>
+            <p style="font-size: 12px; color: #aaa;">動画を再生し、タイミングを合わせて方向ボタンを押すとノーツが追加されます。</p>
+            <div class="direction-buttons">
+                <td></td>
+                <button onclick="addNote('UP')">↑ (上)</button>
+                <td></td>
+                <button onclick="addNote('LEFT')">← (左)</button>
+                <button style="background:#222; cursor:default;"></button>
+                <button onclick="addNote('RIGHT')">→ (右)</button>
+                <td></td>
+                <button onclick="addNote('DOWN')">↓ (下)</button>
+                <td></td>
+            </div>
+
+            <div id="chart-list">追加されたノーツがここに表示されます</div>
+
+            <hr style="border: 0.5px solid #444; width: 100%;">
+
+            <button id="download-json-btn" style="background: #28a745;">JSONをダウンロード</button>
+            <label style="margin-top: 5px;">
+                JSON譜面を読み込み:
+                <input type="file" id="upload-json" accept=".json">
+            </label>
+        </div>
+    </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+
+    <script>
+        // --- ゲーム状態管理 ---
+        let player;
+        let bpm = 120;
+        let chart = []; // { time: 秒, dir: 方向 }
+        let currentNoteIndex = 0;
+        let score = 0;
+
+        // ボール（プレイヤー）の位置と回転
+        let ball = { x: 300, y: 200, angle: 0, radius: 15, speed: 0.05 };
+        let pivot = { x: 300, y: 200 }; // 回転の基準点
+        let pathPoints = [{ x: 300, y: 200 }]; // パスの座標履歴
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- YouTube API 初期化 ---
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('player', {
+                height: '200',
+                width: '300',
+                videoId: document.getElementById('youtube-id').value,
+                events: {
+                    'onReady': onPlayerReady
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            console.log("YouTube Player Ready");
+        }
+
+        // 動画リロード
+        document.getElementById('load-video-btn').addEventListener('click', () => {
+            const videoId = document.getElementById('youtube-id').value;
+            bpm = parseFloat(document.getElementById('base-bpm').value) || 120;
+            if (player && player.loadVideoById) {
+                player.loadVideoById(videoId);
+                resetGame();
+            }
+        });
+
+        // --- エディタ機能 ---
+        function addNote(direction) {
+            if (!player || typeof player.getCurrentTime !== 'function') return;
+            const currentTime = player.getCurrentTime();
+            
+            chart.push({ time: currentTime, dir: direction });
+            // 時間順にソート
+            chart.sort((a, b) => a.time - b.time);
+            
+            updateChartList();
+            generatePath(); // パスを再計算
+        }
+
+        function updateChartList() {
+            const listDiv = document.getElementById('chart-list');
+            listDiv.innerHTML = chart.map((n, i) => `[${i}] ${n.time.toFixed(2)}秒: ${n.dir}`).join('<br>');
+        }
+
+        function resetGame() {
+            currentNoteIndex = 0;
+            score = 0;
+            ball.x = 300;
+            ball.y = 200;
+            ball.angle = 0;
+            pivot.x = 300;
+            pivot.y = 200;
+            document.getElementById('score-text').innerText = `Hit: 0 / Total: ${chart.length}`;
+            generatePath();
+        }
+
+        // 譜面（JSON）に基づいてマス目の位置を事前に計算
+        function generatePath() {
+            pathPoints = [{ x: 300, y: 200 }];
+            let curX = 300;
+            let curY = 200;
+            const step = 50; // マス目間の距離
+
+            chart.forEach(note => {
+                if (note.dir === 'RIGHT') curX += step;
+                else if (note.dir === 'LEFT') curX -= step;
+                else if (note.dir === 'UP') curY -= step;
+                else if (note.dir === 'DOWN') curY += step;
+                pathPoints.push({ x: curX, y: curY });
+            });
+        }
+
+        // --- ゲームループ & 描画 ---
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+            if (!player || typeof player.getPlayerState !== 'function') return;
+            
+            // 再生中のみボールを回転させる
+            if (player.getPlayerState() === YT.PlayerState.PLAYING) {
+                // BPMに応じた回転速度の計算 (1分間にBPM回、1周する)
+                // ADOFAIは1拍で180度（πラジアン）進むのが基本なのでそれに合わせる
+                const timeSec = player.getCurrentTime();
+                const radiansPerSecond = (bpm / 60) * Math.PI;
+                ball.angle = timeSec * radiansPerSecond;
+                
+                // 現在のターゲットマスをもとに、回転中心（ピボット）を決定
+                if (currentNoteIndex < pathPoints.length) {
+                    pivot.x = pathPoints[currentNoteIndex].x;
+                    pivot.y = pathPoints[currentNoteIndex].y;
+                }
+
+                // ボールの位置を計算（ピボットの周りをまわる）
+                const radius = 25; // 回転半径
+                ball.x = pivot.x + Math.cos(ball.angle) * radius;
+                ball.y = pivot.y + Math.sin(ball.angle) * radius;
+            }
+
+            // 描画処理
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 1. マス目（ライン）の描画
+            if (pathPoints.length > 0) {
+                ctx.beginPath();
+                ctx.strokeStyle = '#555';
+                ctx.lineWidth = 6;
+                ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
+                for (let i = 1; i < pathPoints.length; i++) {
+                    ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+                }
+                ctx.stroke();
+
+                // 各マス目の点
+                pathPoints.forEach((pt, idx) => {
+                    ctx.beginPath();
+                    ctx.fillStyle = idx === currentNoteIndex ? '#ffc107' : '#fff';
+                    ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+
+            // 2. 回転するボールの描画
+            ctx.beginPath();
+            ctx.fillStyle = '#ff4757'; // 火の玉イメージの赤
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 中心点（青い球も重ねるのが本家風ですが、今回はシンプルに1個で回転）
+            ctx.beginPath();
+            ctx.fillStyle = '#2ed573';
+            ctx.arc(pivot.x, pivot.y, 6, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // --- 入力判定 (Spaceキー) ---
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault(); // スクロール防止
+                
+                if (currentNoteIndex >= chart.length) return;
+
+                const currentTime = player.getCurrentTime();
+                const targetTime = chart[currentNoteIndex].time;
+                const diff = Math.abs(currentTime - targetTime);
+
+                // 判定幅 (例: 0.15秒以内ならGood)
+                if (diff < 0.15) {
+                    score++;
+                    currentNoteIndex++;
+                    document.getElementById('score-text').innerText = `Hit: ${score} / Total: ${chart.length}`;
+                } else {
+                    console.log("Miss! ズレ:", diff);
+                }
+            }
+        });
+
+        // --- JSONの保存と読み込み ---
+        // ダウンロード
+        document.getElementById('download-json-btn').addEventListener('click', () => {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+                youtubeId: document.getElementById('youtube-id').value,
+                bpm: bpm,
+                chart: chart
+            }, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "adofai_chart.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        });
+
+        // アップロード（インポート）
+        document.getElementById('upload-json').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const parsed = JSON.parse(evt.target.result);
+                    document.getElementById('youtube-id').value = parsed.youtubeId || "";
+                    document.getElementById('base-bpm').value = parsed.bpm || 120;
+                    bpm = parsed.bpm || 120;
+                    chart = parsed.chart || [];
+                    
+                    updateChartList();
+                    if (player && player.loadVideoById) {
+                        player.loadVideoById(parsed.youtubeId);
+                    }
+                    resetGame();
+                    alert("譜面を読み込みました！");
+                } catch (err) {
+                    alert("JSONファイルの形式が正しくありません。");
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        // ループ開始
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
