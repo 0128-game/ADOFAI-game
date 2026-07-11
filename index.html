@@ -9,7 +9,7 @@
   <!-- FontAwesome for Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    /* プレイ画面のキャンバス発光エフェクト */
+    /* プレイ画面 of canvas 発光エフェクト */
     canvas {
       box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
     }
@@ -594,7 +594,9 @@
           // お見逃し（完全にタイミングを逃して1周以上オーバー回転したとき）の検出ロジック
           const currentTile = currentMap.tiles[currentTileIndex];
           const nextTile = currentMap.tiles[currentTileIndex + 1];
-          if (nextTile) {
+          
+          // 開始猶予期間中(stateCheckGracePeriod)は、タイムラグ検知暴発を防ぐためにお見逃しチェックを行わない
+          if (nextTile && !stateCheckGracePeriod) {
             const bpm = currentTile.bpm;
             const beatDuration = 60 / bpm;
             const elapsed = ytTime - lastBeatTime;
@@ -828,7 +830,7 @@
       document.getElementById('countdown-view').classList.add('hidden');
       document.getElementById('game-overlay').classList.add('opacity-0', 'pointer-events-none');
 
-      // 開始時に猶予期間（グレースピリオド）をONにして、バッファリングなどの一時中断を無視する
+      // 開始時に猶予期間（グレースピリオド）をONにして、バッファリングなどの一時中断・お見逃し暴発を無視する
       stateCheckGracePeriod = true;
       setTimeout(() => {
         stateCheckGracePeriod = false;
@@ -1190,7 +1192,17 @@
         mode = 'play';
         document.getElementById('btn-mode-play').className = "px-4 py-1.5 rounded-md text-sm font-bold transition bg-indigo-600 text-white shadow-lg";
         document.getElementById('btn-mode-edit').className = "px-4 py-1.5 rounded-md text-sm font-bold transition text-slate-400 hover:text-white";
+        
         stopGame();
+        
+        // 【修正】エディターで選択されていた位置等に関わらず、
+        // プレイモード選択時にボールとカメラの位置をスタート地点（id:1）に確実にリセットする
+        currentTileIndex = 0;
+        ballPivotIndex = 0;
+        combo = 0;
+        orangeConsecutiveCount = 0;
+        rotationDir = 1;
+        
         updateUI();
       });
 
